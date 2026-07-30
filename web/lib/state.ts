@@ -20,7 +20,7 @@ export async function getLatestState(): Promise<StateFile | null> {
   if (!existing) {
     return null;
   }
-  const response = await fetch(existing.url, { next: { revalidate: 120 } } as any);
+  const response = await fetch(existing.url, { next: { revalidate: 120 } });
   if (!response.ok) {
     throw new Error(`Failed to fetch state blob: ${response.status}`);
   }
