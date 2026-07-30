@@ -35,7 +35,7 @@ describe('storage', () => {
     expect(mocks.put).toHaveBeenCalledWith(
       'creneaux.json',
       JSON.stringify(state),
-      expect.objectContaining({ allowOverwrite: true })
+      expect.objectContaining({ addRandomSuffix: false })
     );
   });
 });

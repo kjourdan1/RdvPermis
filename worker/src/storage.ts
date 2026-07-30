@@ -20,7 +20,6 @@ export async function writeState(state: StateFile): Promise<void> {
   await put(STATE_BLOB_PATH, JSON.stringify(state), {
     access: 'public',
     addRandomSuffix: false,
-    allowOverwrite: true,
     contentType: 'application/json',
   });
 }
