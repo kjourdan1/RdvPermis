@@ -120,6 +120,7 @@ describe('run', () => {
     await run(NOW);
 
     expect(process.exitCode).toBeUndefined();
+    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(DEPARTEMENTS.length);
     expect(mocks.writeState).toHaveBeenCalledWith(
       expect.objectContaining({ creneaux: expect.arrayContaining([previous]) })
     );
@@ -141,6 +142,7 @@ describe('run', () => {
 
     expect(mocks.login).toHaveBeenCalledTimes(2);
     expect(process.exitCode).toBeUndefined();
+    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(DEPARTEMENTS.length + 1);
     expect(mocks.writeState).toHaveBeenCalled();
   });
 
@@ -171,5 +173,27 @@ describe('run', () => {
     await run(NOW);
 
     expect(process.exitCode).toBe(1);
+  });
+
+  it('sets exitCode to 1 but still writes state when Telegram notification fails', async () => {
+    mocks.readState.mockResolvedValue(null);
+    mocks.login.mockResolvedValue('session=abc');
+    mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) =>
+      dep === DEPARTEMENTS[0]
+        ? [{ departement: dep, centre: 'Centre Test', date: '2026-08-14', heure: '14:30' }]
+        : []
+    );
+    mocks.sendTelegramNotification.mockRejectedValue(new Error('telegram down'));
+
+    await run(NOW);
+
+    expect(process.exitCode).toBe(1);
+    expect(mocks.writeState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creneaux: expect.arrayContaining([
+          { departement: DEPARTEMENTS[0], centre: 'Centre Test', date: '2026-08-14', heure: '14:30' },
+        ]),
+      })
+    );
   });
 });

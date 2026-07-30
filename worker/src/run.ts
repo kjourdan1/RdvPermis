@@ -68,7 +68,12 @@ export async function run(now: Date = new Date()): Promise<void> {
 
   const newCreneaux = findNewCreneaux(previousCreneaux, allCreneaux);
   if (newCreneaux.length > 0) {
-    await sendTelegramNotification(formatNewCreneauxMessage(newCreneaux));
+    try {
+      await sendTelegramNotification(formatNewCreneauxMessage(newCreneaux));
+    } catch (error) {
+      console.error('Failed to send Telegram notification:', error);
+      process.exitCode = 1;
+    }
   }
 
   try {
