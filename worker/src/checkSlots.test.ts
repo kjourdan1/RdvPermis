@@ -100,6 +100,16 @@ describe('fetchDepartementCreneaux', () => {
     );
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('throws SessionExpiredError after a transient failure then 401, without a third attempt', async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: false, status: 500 })
+      .mockResolvedValueOnce({ ok: false, status: 401 });
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
+      SessionExpiredError
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('randomDelayMs', () => {
