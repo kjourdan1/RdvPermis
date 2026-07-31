@@ -7,7 +7,7 @@ on:
 
 jobs:
   check:
-    runs-on: [self-hosted, linux, rdvpermis]
+    runs-on: [self-hosted, linux]
     defaults:
       run:
         working-directory: worker
