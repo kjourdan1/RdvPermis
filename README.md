@@ -20,61 +20,66 @@ Telegram. Aucune donnée n'est partagée ni ne transite par un serveur tiers.
 ### Contrainte obligatoire : blocage Cloudflare des IP non résidentielles
 
 Le site cible protège son formulaire de connexion avec Cloudflare, qui bloque l'ensemble des plages
-d'IP de type datacenter/hébergeur — quel que soit le fingerprint du navigateur utilisé. Cela inclut :
+d'IP de type datacenter/hébergeur, quel que soit le fingerprint du navigateur utilisé. Cela inclut :
 
 - les runners GitHub-hosted standards (`ubuntu-latest` et équivalents) ;
 - les VPS et serveurs cloud (OVH, AWS, Azure, etc.), même correctement configurés.
 
-Seules les IP résidentielles ou mobiles atteignent le formulaire de connexion. **Un runner self-hosted
-installé sur un appareil à IP résidentielle est donc obligatoire pour que le workflow GitHub Actions
-fonctionne** — que le dépôt utilisé soit public ou privé : la visibilité du dépôt n'a aucune incidence
-sur ce blocage, qui s'applique à l'IP source de la requête, pas au dépôt qui l'a déclenchée. Un
-Raspberry Pi 4B connecté à une box internet personnelle convient parfaitement à cet usage.
+Seules les IP résidentielles ou mobiles atteignent le formulaire de connexion. **Un runner self-hosted** installé sur un appareil avec une IP résidentielle est donc obligatoire pour que le workflow GitHub Actions fonctionne.
+Un Raspberry Pi connecté à une box internet personnelle convient parfaitement à cet usage.
 
 ### Prérequis
 
-- Un compte GitHub, avec [la CLI `gh`](https://cli.github.com/) installée et authentifiée
+- Un compte GitHub, avec [le CLI `gh`](https://cli.github.com/) installée et authentifiée
   (`gh auth login`).
-- Un compte [Vercel](https://vercel.com) (gratuit), avec la CLI `vercel` installée
+- Un compte [Vercel](https://vercel.com) (gratuit), avec le CLI `vercel` installée
   (`npm install -g vercel`).
 - Node.js 20 ou supérieur en local, pour exécuter les tests ou le dashboard en développement.
 - Un compte candidat sur candidat.permisdeconduire.gouv.fr (celui utilisé normalement pour réserver
-  l'examen) — son email et son mot de passe servent à la connexion automatique du worker.
-- Un appareil disponible en permanence sur un réseau résidentiel (Raspberry Pi 4B, mini-PC, poste
-  personnel laissé allumé, etc.) pour héberger le runner self-hosted — voir l'étape 2 ci-dessous.
+  l'examen) : son email et son mot de passe servent à la connexion automatique du worker.
+- Un appareil disponible en permanence sur un réseau résidentiel (Raspberry Pi, mini-PC, poste
+  personnel laissé allumé, etc.) pour héberger le runner self-hosted (voir l'étape 2 ci-dessous).
 
-### Étape 1 — Récupérer le code
+## Sécurité
+
+L'email, le mot de passe, le cookie de session, et tout autre identifiant ne sont jamais stockés,
+loggés, ni commités ailleurs que dans les secrets GitHub Actions du repo concerné. Ils ne sont
+utilisés qu'en mémoire, le temps de l'exécution. Le fichier d'état lu par le dashboard
+(`creneaux.json`) ne contient que département, centre, date, heure, et horodatage de dernière
+vérification.
+
+### Étape 1 : Récupérer le code
 
 Deux options :
 
 - **Fork** (recommandé pour pouvoir récupérer les futures mises à jour) : cliquer sur *Fork* en haut
-  de la page GitHub du dépôt, puis cloner le fork obtenu :
+  de la page GitHub du repo, puis cloner le fork obtenu :
   ```bash
   git clone https://github.com/<compte-github>/RdvPermis.git
   cd RdvPermis
   ```
-- **Copie indépendante** (nouveau dépôt sans lien avec l'original) :
+- **Copie indépendante** (nouveau repo sans lien avec l'original) :
   ```bash
   git clone https://github.com/kjourdan1/RdvPermis.git
   cd RdvPermis
   rm -rf .git && git init
   gh repo create RdvPermis-IDF --public --source=. --remote=origin --push
   ```
-  Remplacer `--public` par `--private` si le dépôt doit rester privé — voir la contrainte ci-dessus :
+  Remplacer `--public` par `--private` si le repo doit rester privé (voir la contrainte ci-dessus) :
   cela ne dispense pas d'installer un runner self-hosted.
 
-### Étape 2 — Installer le runner self-hosted (obligatoire)
+### Étape 2 : Installer le runner self-hosted (obligatoire)
 
 Le workflow `.github/workflows/check-slots.yml` cible déjà `runs-on: [self-hosted, linux]` : aucune
 modification du workflow n'est nécessaire, seul un runner correspondant doit être enregistré sur le
-dépôt.
+repo.
 
 **Exemple avec un Raspberry Pi 4B (Raspberry Pi OS 64 bits) :**
 
 1. Installer Raspberry Pi OS 64 bits sur le Pi et le connecter à la box internet du domicile (Ethernet
    recommandé pour la stabilité). S'assurer que le Pi reste allumé et connecté en permanence : le
    workflow tourne toutes les 15 minutes, 24h/24.
-2. Sur le dépôt GitHub (celui créé à l'étape 1), ouvrir **Settings → Actions → Runners → New
+2. Sur le repo GitHub (celui créé à l'étape 1), ouvrir **Settings → Actions → Runners → New
    self-hosted runner**, choisir `Linux` / `ARM64`, et relever la commande d'enregistrement affichée
    (ou générer un jeton depuis un poste authentifié avec `gh` : `gh api -X POST
    repos/<compte>/<depot>/actions/runners/registration-token --jq '.token'`).
@@ -87,7 +92,7 @@ dépôt.
    tar xzf actions-runner-linux-arm64.tar.gz
    ./bin/installdependencies.sh
    ```
-4. Enregistrer le runner sur le dépôt, avec le jeton d'enregistrement obtenu au point précédent :
+4. Enregistrer le runner sur le repo, avec le jeton d'enregistrement obtenu au point précédent :
    ```bash
    ./config.sh --url https://github.com/<compte>/<depot> --token <TOKEN> \
      --labels self-hosted,linux --unattended
@@ -98,14 +103,14 @@ dépôt.
    sudo ./svc.sh install
    sudo ./svc.sh start
    ```
-6. Vérifier que le runner apparaît en ligne dans **Settings → Actions → Runners** du dépôt (statut
+6. Vérifier que le runner apparaît en ligne dans **Settings → Actions → Runners** du repo (statut
    `Idle`), avec les labels `self-hosted` et `linux`.
 
 Cette procédure est identique pour tout autre appareil résidentiel (mini-PC, poste personnel sous
-Linux) — seule l'architecture du tarball change (`arm64` pour un Raspberry Pi, `x64` pour un PC
+Linux), seule l'architecture du tarball change (`arm64` pour un Raspberry Pi, `x64` pour un PC
 classique).
 
-### Étape 3 — Créer le bot Telegram
+### Étape 3 : Créer le bot Telegram
 
 Procédure détaillée disponible dans
 [ce gist](https://gist.github.com/nafiesl/4ad622f344cd1dc3bb1ecbe468ff9f8a) ; résumé ci-dessous pour
@@ -120,7 +125,7 @@ le cas d'usage de ce projet (notification en message privé).
    affiché qu'une fois (il reste néanmoins récupérable ensuite via `/mybots` → bot concerné → **API
    Token**).
 4. Ouvrir une conversation avec le bot nouvellement créé (chercher son identifiant dans Telegram) et
-   cliquer sur **Start**, ou lui envoyer n'importe quel message — cette étape est nécessaire pour que
+   cliquer sur **Start**, ou lui envoyer n'importe quel message. Cette étape est nécessaire pour que
    Telegram enregistre une conversation entre le compte personnel et le bot.
 5. Récupérer le `TELEGRAM_CHAT_ID` correspondant à cette conversation :
    ```bash
@@ -129,18 +134,18 @@ le cas d'usage de ce projet (notification en message privé).
    Chercher la valeur numérique `result[0].message.chat.id` dans la réponse JSON (un nombre, positif
    pour une conversation privée). Si la réponse est vide (`"result":[]`), c'est que l'étape 4 n'a pas
    été effectuée ou que le message envoyé est trop ancien (Telegram ne conserve les mises à jour non
-   lues que 24h) — renvoyer un message au bot et réessayer.
+   lues que 24h) : renvoyer un message au bot et réessayer.
 6. Vérifier que tout fonctionne en envoyant un message de test directement à l'API :
    ```bash
    curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/sendMessage?chat_id=<TELEGRAM_CHAT_ID>&text=test"
    ```
    Le message « test » doit apparaître dans la conversation avec le bot.
 
-### Étape 4 — Créer le compte Vercel et le store Blob
+### Étape 4 : Créer le compte Vercel et le store Blob
 
 1. Créer un compte sur [vercel.com](https://vercel.com/signup) si nécessaire (l'offre gratuite
    « Hobby » suffit pour ce projet), en s'authentifiant de préférence avec le même compte GitHub que
-   celui utilisé pour le dépôt — cela simplifie la liaison du projet à l'étape 6.
+   celui utilisé pour le repo : cela simplifie la liaison du projet à l'étape 6.
 2. Sur le [dashboard Vercel](https://vercel.com/dashboard), ouvrir l'onglet **Storage**, puis
    **Create Database → Blob**.
 3. Donner un nom au store (par exemple `rdvpermis-state`), choisir une région, et le créer.
@@ -149,10 +154,10 @@ le cas d'usage de ce projet (notification en message privé).
    Ce jeton donne un accès en lecture/écriture au store : à traiter comme un secret, au même titre
    qu'un mot de passe.
 
-### Étape 5 — Poser les secrets GitHub Actions
+### Étape 5 : Poser les secrets GitHub Actions
 
-Depuis le dossier du dépôt (celui créé à l'étape 1), avec `gh` authentifié sur le compte GitHub
-propriétaire du dépôt :
+Depuis le dossier du repo (celui créé à l'étape 1), avec `gh` authentifié sur le compte GitHub
+propriétaire du repo :
 
 ```bash
 gh secret set EMAIL --body "<email du compte candidat.permisdeconduire.gouv.fr>"
@@ -163,10 +168,10 @@ gh secret set BLOB_READ_WRITE_TOKEN --body "<jeton du store Blob>"
 ```
 
 Ces valeurs ne doivent **jamais** être écrites dans un fichier versionné, un message de commit, ni
-collées dans une conversation — uniquement transmises à `gh secret set`, qui les envoie chiffrées à
-GitHub.
+collées dans une conversation : elles doivent uniquement être transmises à `gh secret set`, qui les
+envoie chiffrées à GitHub.
 
-### Étape 6 — Déployer le dashboard sur Vercel
+### Étape 6 : Déployer le dashboard sur Vercel
 
 ```bash
 cd web
@@ -179,7 +184,7 @@ vercel --prod
 Une URL de production est affichée (par exemple `https://projet.vercel.app`) : il s'agit du dashboard
 public.
 
-### Étape 7 — Vérifier que tout fonctionne
+### Étape 7 : Vérifier que tout fonctionne
 
 ```bash
 gh workflow run "Check RdvPermis slots"
@@ -193,7 +198,7 @@ nouveau est trouvé : l'absence de message ne signifie pas que l'exécution a é
 
 Le workflow s'exécute ensuite automatiquement toutes les 15 minutes via le cron défini dans
 `.github/workflows/check-slots.yml`, sans action supplémentaire. À noter : GitHub désactive
-automatiquement les workflows planifiés (`schedule`) après 60 jours sans activité sur le dépôt — un
+automatiquement les workflows planifiés (`schedule`) après 60 jours sans activité sur le repo. Un
 `git push`, même minime, suffit à réactiver le cron le cas échéant.
 
 ## Configuration
@@ -204,14 +209,6 @@ automatiquement les workflows planifiés (`schedule`) après 60 jours sans activ
   `PEAK_CHECK_INTERVAL_MINUTES`, `OFF_PEAK_CHECK_INTERVAL_MINUTES` dans `worker/src/config.ts`. Ces
   heures sont interprétées en heure de Paris (CET/CEST géré automatiquement).
 - **Changer le délai entre appels API** : `MIN_DELAY_MS` / `MAX_DELAY_MS` dans `worker/src/config.ts`.
-
-## Sécurité
-
-L'email, le mot de passe, le cookie de session, et tout autre identifiant ne sont jamais stockés,
-loggés, ni commités ailleurs que dans les secrets GitHub Actions du dépôt concerné — ils ne sont
-utilisés qu'en mémoire, le temps de l'exécution. Le fichier d'état lu par le dashboard
-(`creneaux.json`) ne contient que département, centre, date, heure, et horodatage de dernière
-vérification.
 
 ## Tests
 
