@@ -22,12 +22,26 @@ export async function login(email: string, password: string): Promise<string> {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto(LOGIN_URL, { waitUntil: 'networkidle' });
-    await page.fill(EMAIL_SELECTOR, email);
-    await page.fill(PASSWORD_SELECTOR, password);
-    await page.click(SUBMIT_SELECTOR);
-    await page.waitForURL((url) => url.hostname === 'candidat.permisdeconduire.gouv.fr', {
-      timeout: 30000,
-    });
+    try {
+      await page.fill(EMAIL_SELECTOR, email);
+      await page.fill(PASSWORD_SELECTOR, password);
+      await page.click(SUBMIT_SELECTOR);
+      await page.waitForURL((url) => url.hostname === 'candidat.permisdeconduire.gouv.fr', {
+        timeout: 30000,
+      });
+    } catch (error) {
+      // Diagnostic-only: capture what the page actually looked like when the
+      // expected login form/redirect never showed up (e.g. a bot-detection
+      // challenge instead of the real form), without ever writing credentials
+      // to disk. Uploaded as a CI artifact by the workflow on failure.
+      await page.screenshot({ path: 'login-failure.png', fullPage: true }).catch(() => {});
+      const html = await page.content().catch(() => null);
+      if (html) {
+        const fs = await import('node:fs/promises');
+        await fs.writeFile('login-failure.html', html).catch(() => {});
+      }
+      throw error;
+    }
     const cookies = await context.cookies();
     return formatCookieHeader(cookies);
   } finally {

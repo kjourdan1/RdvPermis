@@ -34,3 +34,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
         run: npm run run
+
+      - name: Upload login debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-debug
+          path: |
+            worker/login-failure.png
+            worker/login-failure.html
+          if-no-files-found: ignore
+          retention-days: 3
