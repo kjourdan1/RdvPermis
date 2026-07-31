@@ -38,8 +38,8 @@ const NOW = new Date('2026-01-15T09:00:00Z'); // 10:00 Paris, off-peak
 describe('run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NEPH = 'test-neph';
-    process.env.DATE_NAISSANCE = '1990-01-01';
+    process.env.EMAIL = 'test@example.com';
+    process.env.PASSWORD = 'test-password';
     process.exitCode = undefined;
   });
 

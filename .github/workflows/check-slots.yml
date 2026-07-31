@@ -28,8 +28,8 @@ jobs:
 
       - name: Run slot check
         env:
-          NEPH: ${{ secrets.NEPH }}
-          DATE_NAISSANCE: ${{ secrets.DATE_NAISSANCE }}
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}

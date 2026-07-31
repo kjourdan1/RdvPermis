@@ -21,8 +21,8 @@ ne réserve jamais automatiquement.
 3. **Repo GitHub** : `gh repo create RdvPermis-IDF --public --source=. --remote=origin --push`.
 4. **Secrets GitHub Actions** :
    ```bash
-   gh secret set NEPH --body "<votre-neph>"
-   gh secret set DATE_NAISSANCE --body "<votre-date-naissance>"
+   gh secret set EMAIL --body "<votre-email-de-connexion>"
+   gh secret set PASSWORD --body "<votre-mot-de-passe>"
    gh secret set TELEGRAM_BOT_TOKEN --body "<votre-token-bot>"
    gh secret set TELEGRAM_CHAT_ID --body "<votre-chat-id>"
    gh secret set BLOB_READ_WRITE_TOKEN --body "<votre-token-blob>"

@@ -20,17 +20,17 @@ export async function run(now: Date = new Date()): Promise<void> {
     return;
   }
 
-  const neph = process.env.NEPH;
-  const dateNaissance = process.env.DATE_NAISSANCE;
-  if (!neph || !dateNaissance) {
-    console.error('NEPH and DATE_NAISSANCE environment variables must be set');
+  const email = process.env.EMAIL;
+  const password = process.env.PASSWORD;
+  if (!email || !password) {
+    console.error('EMAIL and PASSWORD environment variables must be set');
     process.exitCode = 1;
     return;
   }
 
   let cookieHeader: string;
   try {
-    cookieHeader = await login(neph, dateNaissance);
+    cookieHeader = await login(email, password);
   } catch (error) {
     console.error('Login failed:', error);
     process.exitCode = 1;
@@ -49,7 +49,7 @@ export async function run(now: Date = new Date()): Promise<void> {
       if (error instanceof SessionExpiredError && !sessionRetried) {
         sessionRetried = true;
         try {
-          cookieHeader = await login(neph, dateNaissance);
+          cookieHeader = await login(email, password);
           const creneaux = await fetchDepartementCreneaux(departement, cookieHeader);
           allCreneaux.push(...creneaux);
           await sleep(randomDelayMs(MIN_DELAY_MS, MAX_DELAY_MS));
