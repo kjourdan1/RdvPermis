@@ -7,3 +7,5 @@ dist/
 *.tsbuildinfo
 worker/login-failure.png
 worker/login-failure.html
+.claude/
+CLAUDE.md
