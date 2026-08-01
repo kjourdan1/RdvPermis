@@ -21,8 +21,14 @@ export async function login(email: string, password: string): Promise<string> {
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto(LOGIN_URL, { waitUntil: 'networkidle' });
     try {
+      // 'domcontentloaded' instead of 'networkidle': the real login page (or
+      // an interactive Cloudflare challenge) can have ongoing background
+      // requests (telemetry, challenge polling) that never go quiet, so
+      // waiting for full network silence can hang past the timeout even
+      // when the page itself is ready. page.fill() below does its own
+      // wait-for-visible on the actual selector we need.
+      await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' });
       await page.fill(EMAIL_SELECTOR, email);
       await page.fill(PASSWORD_SELECTOR, password);
       await page.click(SUBMIT_SELECTOR);
