@@ -51,10 +51,23 @@ export function parseApiResponse(departement: string, raw: unknown): Creneau[] {
 
 const API_BASE = 'https://candidat.permisdeconduire.gouv.fr/api/v1/candidat/creneaux';
 
-// Cloudflare 403s a bare Node fetch's default User-Agent regardless of an
-// otherwise-valid session cookie; a realistic browser UA is enough to pass.
-const USER_AGENT =
-  'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
+// A bare Node fetch is missing everything a real Chrome XHR sends alongside
+// its User-Agent (the sec-ch-ua/sec-fetch-* Client Hints); claiming to be
+// Chrome via UA while omitting all of them is itself an inconsistency
+// Cloudflare's bot-management can key on independently of cookie validity.
+// This exact header set is what worker/login-container's own DevTools-copied
+// request used successfully against this same endpoint.
+const API_HEADERS = {
+  Accept: 'application/json, text/plain, */*',
+  'User-Agent':
+    'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+  'sec-ch-ua': '"Not;A=Brand";v="8", "Chromium";v="150"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Linux"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-origin',
+};
 
 export async function fetchDepartementCreneaux(
   departement: string,
@@ -63,9 +76,8 @@ export async function fetchDepartementCreneaux(
   const attempt = async (): Promise<Creneau[]> => {
     const response = await fetch(`${API_BASE}?code-departement=${departement}`, {
       headers: {
+        ...API_HEADERS,
         Cookie: cookieHeader,
-        Accept: 'application/json, text/plain, */*',
-        'User-Agent': USER_AGENT,
       },
     });
     if (response.status === 401 || response.status === 403) {
