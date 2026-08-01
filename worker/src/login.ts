@@ -11,6 +11,7 @@ const LOGIN_URL = 'https://candidat.permisdeconduire.gouv.fr/';
 const EMAIL_SELECTOR = '#username';
 const PASSWORD_SELECTOR = '#password';
 const SUBMIT_SELECTOR = '#kc-login';
+const COOKIE_ACCEPT_SELECTOR = '#footer_tc_privacy_button';
 
 export function formatCookieHeader(cookies: Array<{ name: string; value: string }>): string {
   return cookies.map((c) => `${c.name}=${c.value}`).join('; ');
@@ -29,6 +30,11 @@ export async function login(email: string, password: string): Promise<string> {
       // when the page itself is ready. page.fill() below does its own
       // wait-for-visible on the actual selector we need.
       await page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded' });
+      // The cookie-consent banner sits in front of the form and appears to
+      // block the Cloudflare Turnstile widget from ever rendering (confirmed
+      // 2026-08-01: #kc-captcha stayed empty, #kc-login stayed disabled).
+      // Dismiss it before touching the form; non-fatal if it never appears.
+      await page.locator(COOKIE_ACCEPT_SELECTOR).click({ timeout: 5000 }).catch(() => {});
       await page.fill(EMAIL_SELECTOR, email);
       await page.fill(PASSWORD_SELECTOR, password);
       await page.click(SUBMIT_SELECTOR);

@@ -32,6 +32,7 @@ describe('login', () => {
   it('launches a headed real Chrome, not headless bundled Chromium', async () => {
     const page = {
       goto: vi.fn().mockResolvedValue(undefined),
+      locator: vi.fn().mockReturnValue({ click: vi.fn().mockResolvedValue(undefined) }),
       fill: vi.fn().mockResolvedValue(undefined),
       click: vi.fn().mockResolvedValue(undefined),
       waitForURL: vi.fn().mockResolvedValue(undefined),
