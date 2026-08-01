@@ -129,14 +129,18 @@ sleep 1
 # Cookie header string checkSlots.ts needs -- no crypto involved.
 echo '[run] extracting cookie via devtools'
 xdotool key --clearmodifiers F12
-sleep 2
-xdotool mousemove 1038 157; xdotool click 1; sleep 0.5
-# Chromium's own reload button, not DevTools' inline "Reload page" button --
-# the latter never registered a click reliably in this environment.
-xdotool mousemove 95 63; xdotool click 1
 sleep 3
+xdotool mousemove 1038 157; xdotool click 1; sleep 1
+# Chromium's own reload button, not DevTools' inline "Reload page" button --
+# the latter never registered a click reliably in this environment. The
+# Network tab has to actually be recording *before* the click, and the page
+# needs time to reload and finish fetching before we go looking for the
+# request row -- both steps that were racing ahead of the real page state
+# on the CI runner (see the two timing fixes above this one).
+xdotool mousemove 95 63; xdotool click 1
+sleep 6
 xdotool mousemove 830 392; xdotool click 1
-sleep 1
+sleep 2
 scrot /output/5-network.png
 xdotool mousemove 1100 650
 for i in 1 2 3 4 5 6 7 8 9 10 11; do xdotool click 5; sleep 0.1; done
