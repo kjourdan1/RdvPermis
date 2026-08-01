@@ -1,4 +1,8 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { Creneau } from './types';
+
+const execFileAsync = promisify(execFile);
 
 export class SessionExpiredError extends Error {
   constructor(departement: string) {
@@ -69,24 +73,45 @@ const API_HEADERS = {
   'sec-fetch-site': 'same-origin',
 };
 
+// Shells out to curl instead of using Node's own fetch: an identical request
+// (same cookie, same headers, same URL) reliably got 200 via curl but was
+// rejected as a session error via Node's fetch/undici in CI. The remaining
+// difference between them is below the HTTP layer (TLS/HTTP2 fingerprint),
+// which was flagged as a real risk from the start of this investigation --
+// curl is what's actually been proven to work against this endpoint.
+async function curlGet(
+  url: string,
+  headers: Record<string, string>
+): Promise<{ status: number; body: string }> {
+  const headerArgs = Object.entries(headers).flatMap(([key, value]) => ['-H', `${key}: ${value}`]);
+  const { stdout } = await execFileAsync(
+    'curl',
+    ['-s', '-o', '-', '-w', '\n%{http_code}', ...headerArgs, url],
+    { maxBuffer: 10 * 1024 * 1024 }
+  );
+  const splitAt = stdout.lastIndexOf('\n');
+  return {
+    body: stdout.slice(0, splitAt),
+    status: Number(stdout.slice(splitAt + 1).trim()),
+  };
+}
+
 export async function fetchDepartementCreneaux(
   departement: string,
   cookieHeader: string
 ): Promise<Creneau[]> {
   const attempt = async (): Promise<Creneau[]> => {
-    const response = await fetch(`${API_BASE}?code-departement=${departement}`, {
-      headers: {
-        ...API_HEADERS,
-        Cookie: cookieHeader,
-      },
+    const { status, body } = await curlGet(`${API_BASE}?code-departement=${departement}`, {
+      ...API_HEADERS,
+      Cookie: cookieHeader,
     });
-    if (response.status === 401 || response.status === 403) {
+    if (status === 401 || status === 403) {
       throw new SessionExpiredError(departement);
     }
-    if (!response.ok) {
-      throw new Error(`Creneaux API returned ${response.status} for departement ${departement}`);
+    if (status < 200 || status >= 300) {
+      throw new Error(`Creneaux API returned ${status} for departement ${departement}`);
     }
-    return parseApiResponse(departement, await response.json());
+    return parseApiResponse(departement, JSON.parse(body));
   };
 
   try {

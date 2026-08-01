@@ -1,10 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  execFile: vi.fn(),
+}));
+
+vi.mock('node:child_process', () => ({
+  execFile: mocks.execFile,
+}));
+
 import {
   parseApiResponse,
   fetchDepartementCreneaux,
   randomDelayMs,
   SessionExpiredError,
 } from './checkSlots';
+
+// execFile is promisified via node:util's callback-style wrapping, so the
+// mock has to behave like the callback form: (file, args, opts, callback).
+function mockCurlResult(status: number, body: string) {
+  mocks.execFile.mockImplementationOnce((_file, _args, _opts, callback) => {
+    callback(null, { stdout: `${body}\n${status}`, stderr: '' });
+  });
+}
+
+function mockCurlError(error: Error) {
+  mocks.execFile.mockImplementationOnce((_file, _args, _opts, callback) => {
+    callback(error, { stdout: '', stderr: '' });
+  });
+}
 
 describe('parseApiResponse', () => {
   it('converts each creneau to Paris local date and time', () => {
@@ -50,65 +73,72 @@ describe('parseApiResponse', () => {
 
 describe('fetchDepartementCreneaux', () => {
   beforeEach(() => {
-    global.fetch = vi.fn();
+    mocks.execFile.mockReset();
   });
 
   it('returns parsed creneaux on success', async () => {
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => [
+    mockCurlResult(
+      200,
+      JSON.stringify([
         { centre: { nom: 'Centre A' }, creneaux: [{ dateDebut: '2026-08-14T12:30:00.000Z' }] },
-      ],
-    });
+      ])
+    );
     const result = await fetchDepartementCreneaux('078', 'session=abc');
     expect(result).toEqual([
       { departement: '078', centre: 'Centre A', date: '2026-08-14', heure: '14:30' },
     ]);
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
 
   it('retries once after a transient failure and succeeds on the second attempt', async () => {
-    (global.fetch as any)
-      .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+    mockCurlResult(500, '');
+    mockCurlResult(200, '[]');
     const result = await fetchDepartementCreneaux('078', 'session=abc');
     expect(result).toEqual([]);
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.execFile).toHaveBeenCalledTimes(2);
   });
 
   it('throws after two consecutive transient failures', async () => {
-    (global.fetch as any).mockResolvedValue({ ok: false, status: 500 });
+    mockCurlResult(500, '');
+    mockCurlResult(500, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toThrow(
       'Creneaux API returned 500 for departement 078'
     );
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.execFile).toHaveBeenCalledTimes(2);
   });
 
   it('throws SessionExpiredError immediately on a 401, without retrying', async () => {
-    (global.fetch as any).mockResolvedValue({ ok: false, status: 401 });
+    mockCurlResult(401, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
       SessionExpiredError
     );
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
 
   it('throws SessionExpiredError immediately on a 403, without retrying', async () => {
-    (global.fetch as any).mockResolvedValue({ ok: false, status: 403 });
+    mockCurlResult(403, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
       SessionExpiredError
     );
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
 
   it('throws SessionExpiredError after a transient failure then 401, without a third attempt', async () => {
-    (global.fetch as any)
-      .mockResolvedValueOnce({ ok: false, status: 500 })
-      .mockResolvedValueOnce({ ok: false, status: 401 });
+    mockCurlResult(500, '');
+    mockCurlResult(401, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
       SessionExpiredError
     );
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(mocks.execFile).toHaveBeenCalledTimes(2);
+  });
+
+  it('propagates a curl execution failure (e.g. network down)', async () => {
+    mockCurlError(new Error('curl: (6) Could not resolve host'));
+    mockCurlError(new Error('curl: (6) Could not resolve host'));
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toThrow(
+      'Could not resolve host'
+    );
+    expect(mocks.execFile).toHaveBeenCalledTimes(2);
   });
 });
 
