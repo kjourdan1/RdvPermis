@@ -56,6 +56,14 @@ if [[ -z "$WIN" ]]; then
   exit 1
 fi
 echo "[run] chromium window: $WIN"
+# The window can exist before the page has actually rendered (confirmed on
+# the CI runner: the first screenshot came back blank white), and clicking
+# too early lands on whatever partial content happened to render first --
+# in one run, that was the FranceConnect button instead of the cookie
+# banner, sending the whole flow down the wrong provider's login page.
+# There's no CDP here to wait for a real "page loaded" event, so a generous
+# fixed margin is the pragmatic fix.
+sleep 5
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
 sleep 0.5
