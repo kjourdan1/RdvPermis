@@ -139,6 +139,12 @@ xdotool mousemove 1038 157; xdotool click 1; sleep 1
 # on the CI runner (see the two timing fixes above this one).
 xdotool mousemove 95 63; xdotool click 1
 sleep 6
+# Filter to "Doc" requests only first: by the time we get here there can be
+# dozens of requests loaded (fonts, scripts, images...), so a fixed pixel
+# position for "the top row" isn't reliable -- it hit a font file's row in
+# one CI run. Filtering down to the one document request first makes its
+# row position deterministic regardless of how much else has loaded.
+xdotool mousemove 853 261; xdotool click 1; sleep 1
 xdotool mousemove 830 392; xdotool click 1
 sleep 2
 scrot /output/5-network.png
