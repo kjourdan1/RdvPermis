@@ -51,6 +51,11 @@ export function parseApiResponse(departement: string, raw: unknown): Creneau[] {
 
 const API_BASE = 'https://candidat.permisdeconduire.gouv.fr/api/v1/candidat/creneaux';
 
+// Cloudflare 403s a bare Node fetch's default User-Agent regardless of an
+// otherwise-valid session cookie; a realistic browser UA is enough to pass.
+const USER_AGENT =
+  'Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36';
+
 export async function fetchDepartementCreneaux(
   departement: string,
   cookieHeader: string
@@ -60,6 +65,7 @@ export async function fetchDepartementCreneaux(
       headers: {
         Cookie: cookieHeader,
         Accept: 'application/json, text/plain, */*',
+        'User-Agent': USER_AGENT,
       },
     });
     if (response.status === 401 || response.status === 403) {

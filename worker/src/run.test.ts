@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   readState: vi.fn(),
   writeState: vi.fn(),
-  login: vi.fn(),
   fetchDepartementCreneaux: vi.fn(),
   sendTelegramNotification: vi.fn(),
 }));
@@ -15,10 +14,6 @@ vi.mock('./config', async () => {
 vi.mock('./storage', () => ({
   readState: mocks.readState,
   writeState: mocks.writeState,
-}));
-vi.mock('./login', () => ({
-  login: mocks.login,
-  formatCookieHeader: vi.fn(),
 }));
 vi.mock('./checkSlots', async () => {
   const actual = await vi.importActual<typeof import('./checkSlots')>('./checkSlots');
@@ -38,8 +33,7 @@ const NOW = new Date('2026-01-15T09:00:00Z'); // 10:00 Paris, off-peak
 describe('run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NEPH = 'test-neph';
-    process.env.DATE_NAISSANCE = '1990-01-01';
+    process.env.COOKIE_HEADER = 'session=abc';
     process.exitCode = undefined;
   });
 
@@ -51,13 +45,12 @@ describe('run', () => {
 
     await run(NOW);
 
-    expect(mocks.login).not.toHaveBeenCalled();
+    expect(mocks.fetchDepartementCreneaux).not.toHaveBeenCalled();
     expect(mocks.writeState).not.toHaveBeenCalled();
   });
 
   it('fetches all departements, notifies on new creneaux, and writes state', async () => {
     mocks.readState.mockResolvedValue(null);
-    mocks.login.mockResolvedValue('session=abc');
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => [
       { departement: dep, centre: 'Centre Test', date: '2026-08-14', heure: '14:30' },
     ]);
@@ -80,7 +73,6 @@ describe('run', () => {
       heure: '14:30',
     };
     mocks.readState.mockResolvedValue({ creneaux: [existing], lastChecked: null });
-    mocks.login.mockResolvedValue('session=abc');
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) =>
       dep === DEPARTEMENTS[0] ? [existing] : []
     );
@@ -91,13 +83,14 @@ describe('run', () => {
     expect(mocks.writeState).toHaveBeenCalled();
   });
 
-  it('sets exitCode to 1 and does not write state when login fails', async () => {
+  it('sets exitCode to 1 and does not write state when COOKIE_HEADER is not set', async () => {
+    delete process.env.COOKIE_HEADER;
     mocks.readState.mockResolvedValue(null);
-    mocks.login.mockRejectedValue(new Error('boom'));
 
     await run(NOW);
 
     expect(process.exitCode).toBe(1);
+    expect(mocks.fetchDepartementCreneaux).not.toHaveBeenCalled();
     expect(mocks.writeState).not.toHaveBeenCalled();
   });
 
@@ -109,7 +102,6 @@ describe('run', () => {
       heure: '14:30',
     };
     mocks.readState.mockResolvedValue({ creneaux: [previous], lastChecked: null });
-    mocks.login.mockResolvedValue('session=abc');
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
       if (dep === DEPARTEMENTS[0]) {
         throw new Error('network error');
@@ -126,31 +118,11 @@ describe('run', () => {
     );
   });
 
-  it('re-logs in once on SessionExpiredError and retries the departement', async () => {
+  it('stops immediately and sets exitCode to 1 on SessionExpiredError, without writing state', async () => {
+    // The login-container step already verified this exact cookie against
+    // this exact API right before handing off, so there is no in-process
+    // re-login to fall back to here -- see worker/login-container.
     mocks.readState.mockResolvedValue(null);
-    mocks.login.mockResolvedValueOnce('session=first').mockResolvedValueOnce('session=second');
-    let firstCallForDep0 = true;
-    mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
-      if (dep === DEPARTEMENTS[0] && firstCallForDep0) {
-        firstCallForDep0 = false;
-        throw new SessionExpiredError(dep);
-      }
-      return [];
-    });
-
-    await run(NOW);
-
-    expect(mocks.login).toHaveBeenCalledTimes(2);
-    expect(process.exitCode).toBeUndefined();
-    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(DEPARTEMENTS.length + 1);
-    expect(mocks.writeState).toHaveBeenCalled();
-  });
-
-  it('sets exitCode to 1 when re-login after session expiry also fails', async () => {
-    mocks.readState.mockResolvedValue(null);
-    mocks.login
-      .mockResolvedValueOnce('session=first')
-      .mockRejectedValueOnce(new Error('relogin failed'));
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
       if (dep === DEPARTEMENTS[0]) {
         throw new SessionExpiredError(dep);
@@ -161,12 +133,12 @@ describe('run', () => {
     await run(NOW);
 
     expect(process.exitCode).toBe(1);
+    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(1);
     expect(mocks.writeState).not.toHaveBeenCalled();
   });
 
   it('sets exitCode to 1 when writing state fails', async () => {
     mocks.readState.mockResolvedValue(null);
-    mocks.login.mockResolvedValue('session=abc');
     mocks.fetchDepartementCreneaux.mockResolvedValue([]);
     mocks.writeState.mockRejectedValue(new Error('blob write failed'));
 
@@ -177,7 +149,6 @@ describe('run', () => {
 
   it('sets exitCode to 1 but still writes state when Telegram notification fails', async () => {
     mocks.readState.mockResolvedValue(null);
-    mocks.login.mockResolvedValue('session=abc');
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) =>
       dep === DEPARTEMENTS[0]
         ? [{ departement: dep, centre: 'Centre Test', date: '2026-08-14', heure: '14:30' }]

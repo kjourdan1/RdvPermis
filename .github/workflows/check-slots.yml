@@ -7,29 +7,56 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: worker
+    # Must run on the Pi: this is the only place with the residential IP and
+    # the real GPU device the login-container needs to render Chromium
+    # without a CDP/software-rendering signature Turnstile can catch.
+    runs-on: [self-hosted, rdvpermis]
     steps:
       - uses: actions/checkout@v4
 
+      - name: Build login container image
+        working-directory: worker/login-container
+        run: docker build -t rdvpermis-login .
+
+      - name: Log in and extract a fresh session cookie
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+        run: |
+          rm -rf /tmp/rdvpermis-output
+          mkdir -p /tmp/rdvpermis-output
+          docker run --rm --device /dev/dri:/dev/dri \
+            -e EMAIL -e PASSWORD \
+            -v /tmp/rdvpermis-output:/output \
+            rdvpermis-login
+
+      - name: Upload login diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-diagnostics-${{ github.run_id }}
+          path: /tmp/rdvpermis-output/*.png
+          retention-days: 7
+
+      - name: Export cookie header for later steps
+        run: |
+          COOKIE=$(cat /tmp/rdvpermis-output/cookie.txt)
+          echo "::add-mask::$COOKIE"
+          echo "COOKIE_HEADER=$COOKIE" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: worker/package-lock.json
 
       - name: Install dependencies
+        working-directory: worker
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
       - name: Run slot check
+        working-directory: worker
         env:
-          NEPH: ${{ secrets.NEPH }}
-          DATE_NAISSANCE: ${{ secrets.DATE_NAISSANCE }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
