@@ -5,9 +5,9 @@ const LOGIN_URL = 'https://candidat.permisdeconduire.gouv.fr/';
 // Verified against the live site 2026-07-31: candidat.permisdeconduire.gouv.fr
 // redirects to a Keycloak login (moncompte.permisdeconduire.gouv.fr) with an
 // email + password form — not NEPH + date de naissance as originally assumed.
-// The form also carries hidden Cloudflare Turnstile / reCAPTCHA fields, so a
-// headless run may still be challenged; this could not be exercised
-// end-to-end without real credentials.
+// Confirmed 2026-08-01: Cloudflare blocks headless Chromium even from a
+// residential IP (login-debug artifact showed its block page), so the
+// browser below runs headed under a real Chrome channel instead.
 const EMAIL_SELECTOR = '#username';
 const PASSWORD_SELECTOR = '#password';
 const SUBMIT_SELECTOR = '#kc-login';
@@ -17,7 +17,7 @@ export function formatCookieHeader(cookies: Array<{ name: string; value: string 
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: false, channel: 'chrome' });
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
