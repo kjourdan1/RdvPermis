@@ -39,9 +39,22 @@ rm -rf /tmp/chromium-profile
 nohup chromium --user-data-dir=/tmp/chromium-profile --window-size=1280,900 --window-position=0,0 \
   --no-first-run --no-default-browser-check --no-sandbox \
   'https://candidat.permisdeconduire.gouv.fr/' > /tmp/chromium.log 2>&1 &
-sleep 8
 
-WIN=$(xdotool search --onlyvisible --class chromium | head -1)
+# `xdotool search` exits non-zero when nothing matches yet, which combined
+# with `set -e`/pipefail would otherwise kill the script outright the first
+# time Chromium takes longer than expected to map its window (as happened on
+# the CI runner's first cold run -- fine locally where it's reliably fast).
+WIN=""
+for i in $(seq 1 30); do
+  WIN=$(xdotool search --onlyvisible --class chromium 2>/dev/null | head -1) || true
+  [[ -n "$WIN" ]] && break
+  sleep 1
+done
+if [[ -z "$WIN" ]]; then
+  echo '[run] chromium never created a window'
+  cat /tmp/chromium.log 2>&1 || true
+  exit 1
+fi
 echo "[run] chromium window: $WIN"
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
