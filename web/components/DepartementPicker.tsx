@@ -4,13 +4,20 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DEPARTEMENTS, foldForSearch } from '@/lib/departements';
+import { DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from '@/lib/departements';
 import { buildFilterHref } from '@/lib/creneaux';
 
 const SEARCH_INDEX = DEPARTEMENTS.map((d) => ({
   ...d,
   haystack: `${foldForSearch(d.name)} ${d.code.toLowerCase()}`,
 }));
+
+const IDF_PRESET_LABEL = `Île-de-France + départements voisins (${IDF_ET_VOISINS.length})`;
+const IDF_PRESET_KEYWORDS = ['idf', 'ile de france', 'voisin', 'voisins'];
+
+function matchesIdfPreset(trimmedQuery: string): boolean {
+  return trimmedQuery === '' || IDF_PRESET_KEYWORDS.some((k) => k.includes(trimmedQuery));
+}
 
 export function DepartementPicker({ selected }: { selected: string[] }) {
   const router = useRouter();
@@ -28,6 +35,7 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
       (allSelected || !selectedSet.has(d.code)) &&
       (trimmedQuery === '' || d.haystack.includes(trimmedQuery))
   );
+  const showIdfPreset = matchesIdfPreset(trimmedQuery);
 
   function toggle(code: string) {
     if (allSelected) {
@@ -35,6 +43,12 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
     } else {
       router.push(buildFilterHref(selected, code));
     }
+    setQuery('');
+    setIsOpen(false);
+  }
+
+  function applyPreset(codes: string[]) {
+    router.push(`?dep=${codes.join(',')}`);
     setQuery('');
     setIsOpen(false);
   }
@@ -72,12 +86,22 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
           aria-hidden="true"
           className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         />
-        {isOpen && options.length > 0 && (
+        {isOpen && (showIdfPreset || options.length > 0) && (
           <div
             id={listboxId}
             role="listbox"
             className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md"
           >
+            {showIdfPreset && (
+              <button
+                type="button"
+                role="option"
+                onClick={() => applyPreset(IDF_ET_VOISINS)}
+                className="block w-full px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent hover:text-accent-foreground"
+              >
+                {IDF_PRESET_LABEL}
+              </button>
+            )}
             {options.map((d) => (
               <button
                 key={d.code}

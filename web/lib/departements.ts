@@ -112,3 +112,11 @@ export const DEPARTEMENTS: DepartementInfo[] = [
   { code: '974', name: 'La Réunion' },
   { code: '976', name: 'Mayotte' },
 ];
+
+// Île-de-France (8 departments) + the 8 departments that directly border the region —
+// used by DepartementPicker's "IDF + voisins" preset. Bordering, not full neighboring
+// administrative regions (e.g. excludes the Manche, all the way out in Normandie).
+export const IDF_ET_VOISINS: string[] = [
+  '075', '077', '078', '091', '092', '093', '094', '095',
+  '002', '010', '027', '028', '045', '051', '060', '089',
+];

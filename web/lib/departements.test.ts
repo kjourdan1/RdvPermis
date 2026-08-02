@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEPARTEMENTS, foldForSearch } from './departements';
+import { DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from './departements';
 
 describe('DEPARTEMENTS', () => {
   it('has exactly 101 entries with no duplicate codes', () => {
@@ -38,5 +38,27 @@ describe('foldForSearch', () => {
 
   it('produces an unaccented, lowercase haystack for every department name', () => {
     expect(DEPARTEMENTS.every((d) => /^[a-z0-9 '-]+$/.test(foldForSearch(d.name)))).toBe(true);
+  });
+});
+
+describe('IDF_ET_VOISINS', () => {
+  it('has exactly 16 entries with no duplicates', () => {
+    expect(IDF_ET_VOISINS).toHaveLength(16);
+    expect(new Set(IDF_ET_VOISINS).size).toBe(16);
+  });
+
+  it('is a subset of known department codes', () => {
+    const knownCodes = new Set(DEPARTEMENTS.map((d) => d.code));
+    expect(IDF_ET_VOISINS.every((code) => knownCodes.has(code))).toBe(true);
+  });
+
+  it('includes all 8 Île-de-France departments', () => {
+    const idf = ['075', '077', '078', '091', '092', '093', '094', '095'];
+    expect(idf.every((code) => IDF_ET_VOISINS.includes(code))).toBe(true);
+  });
+
+  it('includes the 8 bordering departments', () => {
+    const bordering = ['002', '010', '027', '028', '045', '051', '060', '089'];
+    expect(bordering.every((code) => IDF_ET_VOISINS.includes(code))).toBe(true);
   });
 });
