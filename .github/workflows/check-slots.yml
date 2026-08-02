@@ -2,7 +2,19 @@ name: Check RdvPermis slots
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Peak windows (8h-9h, 11h-14h, 16h-18h Paris time), every 15 min. GitHub
+    # Actions cron is always UTC with no DST awareness, so these hours are
+    # hardcoded for CEST (UTC+2, currently in effect). When Paris switches to
+    # CET (UTC+1) at the end of DST -- last Sunday of October -- every hour
+    # below needs +1; switching back to CEST in late March needs -1. The
+    # worker's own PEAK_WINDOWS check (worker/src/schedule.ts) evaluates
+    # Europe/Paris live and doesn't have this problem -- only this raw cron
+    # trigger does.
+    - cron: '*/15 6,9-11,14-15 * * *'
+    # All other hours: once per hour instead of every 15 min, to keep overall
+    # request volume down (avoid tripping Cloudflare's bot detection with a
+    # 101-department check every 15 minutes around the clock).
+    - cron: '0 0-5,7-8,12-13,16-23 * * *'
   workflow_dispatch: {}
 
 jobs:

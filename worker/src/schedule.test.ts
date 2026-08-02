@@ -18,10 +18,10 @@ describe('isPeakWindow', () => {
   });
 
   it('treats the window start as inclusive and the end as exclusive', () => {
-    // 2026-01-15T11:00:00Z = 12:00 Paris -> inside [12,13)
-    expect(isPeakWindow(new Date('2026-01-15T11:00:00Z'))).toBe(true);
-    // 2026-01-15T12:00:00Z = 13:00 Paris -> outside [12,13)
-    expect(isPeakWindow(new Date('2026-01-15T12:00:00Z'))).toBe(false);
+    // 2026-01-15T07:00:00Z = 08:00 Paris -> inside [8,9)
+    expect(isPeakWindow(new Date('2026-01-15T07:00:00Z'))).toBe(true);
+    // 2026-01-15T08:00:00Z = 09:00 Paris -> outside [8,9)
+    expect(isPeakWindow(new Date('2026-01-15T08:00:00Z'))).toBe(false);
   });
 });
 
@@ -44,19 +44,20 @@ describe('shouldRunCheck', () => {
     expect(shouldRunCheck(lastChecked, now)).toBe(true);
   });
 
-  it('returns false off-peak when less than 30 min have elapsed', () => {
+  it('returns false off-peak when less than 60 min have elapsed', () => {
     // now = 10:30 Paris (off-peak), lastChecked = 10:10 Paris -> 20 min elapsed
     const lastChecked = '2026-01-15T09:10:00Z';
     const now = new Date('2026-01-15T09:30:00Z');
     expect(shouldRunCheck(lastChecked, now)).toBe(false);
   });
 
-  it('returns true off-peak when at least 30 min have elapsed, even at irregular minute marks', () => {
+  it('returns true off-peak when at least 60 min have elapsed, even at irregular minute marks', () => {
     // The exact scenario that motivated this design: last real check at
-    // 14:43 Paris, current run lands at 15:17 Paris (neither is a clean
-    // :00/:30 mark, but 34 min have genuinely elapsed and both are off-peak).
+    // 14:43 Paris, current run lands at 15:47 Paris (neither is a clean
+    // :00/:30 mark, but 64 min have genuinely elapsed and both are off-peak
+    // -- hour 14 is off-peak under the new windows since [11,14) excludes 14).
     const lastChecked = '2026-01-15T13:43:00Z'; // 14:43 Paris
-    const now = new Date('2026-01-15T14:17:00Z'); // 15:17 Paris
+    const now = new Date('2026-01-15T14:47:00Z'); // 15:47 Paris
     expect(shouldRunCheck(lastChecked, now)).toBe(true);
   });
 });

@@ -34,11 +34,11 @@ export interface PeakWindow {
 
 export const PEAK_WINDOWS: PeakWindow[] = [
   { startHour: 8, endHour: 9 },
-  { startHour: 12, endHour: 13 },
-  { startHour: 17, endHour: 18 },
+  { startHour: 11, endHour: 14 },
+  { startHour: 16, endHour: 18 },
 ];
 
 export const PEAK_CHECK_INTERVAL_MINUTES = 15;
-export const OFF_PEAK_CHECK_INTERVAL_MINUTES = 30;
+export const OFF_PEAK_CHECK_INTERVAL_MINUTES = 60;
 export const MIN_DELAY_MS = 1000;
 export const MAX_DELAY_MS = 2000;

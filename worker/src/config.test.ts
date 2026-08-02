@@ -33,16 +33,16 @@ describe('config', () => {
     }
   });
 
-  it('defines the three peak windows from the spec', () => {
+  it('defines the three peak windows (8h-9h, 11h-14h, 16h-18h Paris time)', () => {
     expect(PEAK_WINDOWS).toEqual([
       { startHour: 8, endHour: 9 },
-      { startHour: 12, endHour: 13 },
-      { startHour: 17, endHour: 18 },
+      { startHour: 11, endHour: 14 },
+      { startHour: 16, endHour: 18 },
     ]);
   });
 
-  it('sets a 15 min peak interval and 30 min off-peak interval', () => {
+  it('sets a 15 min peak interval and 60 min off-peak interval', () => {
     expect(PEAK_CHECK_INTERVAL_MINUTES).toBe(15);
-    expect(OFF_PEAK_CHECK_INTERVAL_MINUTES).toBe(30);
+    expect(OFF_PEAK_CHECK_INTERVAL_MINUTES).toBe(60);
   });
 });

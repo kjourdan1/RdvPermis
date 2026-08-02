@@ -78,7 +78,8 @@ repo.
 
 1. Installer Raspberry Pi OS 64 bits sur le Pi et le connecter à la box internet du domicile (Ethernet
    recommandé pour la stabilité). S'assurer que le Pi reste allumé et connecté en permanence : le
-   workflow tourne toutes les 15 minutes, 24h/24.
+   workflow tourne 24h/24 (toutes les 15 min en heures de pointe, une fois par heure le reste du
+   temps -- voir `.github/workflows/check-slots.yml`).
 2. Sur le repo GitHub (celui créé à l'étape 1), ouvrir **Settings → Actions → Runners → New
    self-hosted runner**, choisir `Linux` / `ARM64`, et relever la commande d'enregistrement affichée
    (ou générer un jeton depuis un poste authentifié avec `gh` : `gh api -X POST
@@ -196,10 +197,14 @@ enregistré à l'étape 2 (visible dans le log « Set up job »). Ouvrir le log 
 département configuré a bien été interrogé. Un message Telegram n'arrive que si un créneau réellement
 nouveau est trouvé : l'absence de message ne signifie pas que l'exécution a échoué.
 
-Le workflow s'exécute ensuite automatiquement toutes les 15 minutes via le cron défini dans
-`.github/workflows/check-slots.yml`, sans action supplémentaire. À noter : GitHub désactive
-automatiquement les workflows planifiés (`schedule`) après 60 jours sans activité sur le repo. Un
-`git push`, même minime, suffit à réactiver le cron le cas échéant.
+Le workflow s'exécute ensuite automatiquement via les crons définis dans
+`.github/workflows/check-slots.yml` : toutes les 15 min pendant les heures de pointe (8h-9h,
+11h-14h, 16h-18h heure de Paris), une fois par heure le reste du temps -- pour limiter le volume de
+requêtes global. Ces horaires sont codés en dur en UTC (le cron GitHub Actions ne connaît pas les
+fuseaux horaires) et doivent être décalés d'une heure à chaque changement d'heure -- voir le
+commentaire dans le fichier de workflow. À noter : GitHub désactive automatiquement les workflows
+planifiés (`schedule`) après 60 jours sans activité sur le repo. Un `git push`, même minime, suffit
+à réactiver le cron le cas échéant.
 
 ## Configuration
 
@@ -207,7 +212,12 @@ automatiquement les workflows planifiés (`schedule`) après 60 jours sans activ
   `worker/src/config.ts` (codes sur 3 chiffres, zero-paddés, par exemple `"078"`).
 - **Changer les fenêtres de pointe ou la fréquence** : modifier `PEAK_WINDOWS`,
   `PEAK_CHECK_INTERVAL_MINUTES`, `OFF_PEAK_CHECK_INTERVAL_MINUTES` dans `worker/src/config.ts`. Ces
-  heures sont interprétées en heure de Paris (CET/CEST géré automatiquement).
+  heures sont interprétées en heure de Paris (CET/CEST géré automatiquement). **Penser aussi** à
+  mettre à jour les crons (en UTC, non ajustés automatiquement) dans
+  `.github/workflows/check-slots.yml` pour que le déclenchement réel du workflow corresponde aux
+  nouvelles fenêtres — sinon `worker/src/schedule.ts` continuera de sauter les checks hors-fenêtre,
+  mais le conteneur de login (l'étape la plus coûteuse et la plus sensible côté détection) continuera
+  de tourner à l'ancienne fréquence.
 - **Changer le délai entre appels API** : `MIN_DELAY_MS` / `MAX_DELAY_MS` dans `worker/src/config.ts`.
 
 ## Tests
