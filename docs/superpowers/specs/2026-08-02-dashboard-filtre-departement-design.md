@@ -48,6 +48,11 @@ préservé). `revalidate = 120` reste inchangé.
 ## Découpage en composants
 
 - `lib/creneaux.ts` — logique pure, sans dépendance réseau :
+  - `DEPARTEMENTS` — liste des 10 codes (`078`, `091`, `092`, `093`, `094`, `095`, `027`, `028`,
+    `060`, `045`), dupliquée depuis `worker/src/config.ts` : `web/` et `worker/` sont deux
+    déploiements séparés (pas de package partagé), donc pas d'import inter-projet possible. À
+    garder synchronisée manuellement si la liste évolue côté worker — même risque de dérive que
+    n'importe quelle constante dupliquée entre deux projets indépendants.
   - `parseSelectedDepartements(searchParams): string[]` — tout coché si absent/vide ; valeurs
     invalides (hors de `DEPARTEMENTS`) ignorées silencieusement.
   - `filterAndGroup(creneaux, selected): { departement: string; creneaux: Creneau[] }[]` —
