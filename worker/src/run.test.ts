@@ -114,7 +114,9 @@ describe('run', () => {
     expect(process.exitCode).toBeUndefined();
     expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(DEPARTEMENTS.length);
     expect(mocks.writeState).toHaveBeenCalledWith(
-      expect.objectContaining({ creneaux: expect.arrayContaining([previous]) })
+      expect.objectContaining({
+        creneaux: expect.arrayContaining([{ ...previous, isNew: false }]),
+      })
     );
   });
 
@@ -162,7 +164,55 @@ describe('run', () => {
     expect(mocks.writeState).toHaveBeenCalledWith(
       expect.objectContaining({
         creneaux: expect.arrayContaining([
-          { departement: DEPARTEMENTS[0], centre: 'Centre Test', date: '2026-08-14', heure: '14:30' },
+          {
+            departement: DEPARTEMENTS[0],
+            centre: 'Centre Test',
+            date: '2026-08-14',
+            heure: '14:30',
+            isNew: true,
+          },
+        ]),
+      })
+    );
+  });
+
+  it('marks each written creneau as new or not, matching the Telegram diff', async () => {
+    const existing = {
+      departement: DEPARTEMENTS[0],
+      centre: 'Existing Centre',
+      date: '2026-08-14',
+      heure: '14:30',
+      isNew: true, // stale from a previous run -- must not leak through unchanged
+    };
+    mocks.readState.mockResolvedValue({ creneaux: [existing], lastChecked: null });
+    mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) =>
+      dep === DEPARTEMENTS[0]
+        ? [
+            { departement: dep, centre: 'Existing Centre', date: '2026-08-14', heure: '14:30' },
+            { departement: dep, centre: 'Brand New Centre', date: '2026-08-15', heure: '09:00' },
+          ]
+        : []
+    );
+
+    await run(NOW);
+
+    expect(mocks.writeState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creneaux: expect.arrayContaining([
+          {
+            departement: DEPARTEMENTS[0],
+            centre: 'Existing Centre',
+            date: '2026-08-14',
+            heure: '14:30',
+            isNew: false,
+          },
+          {
+            departement: DEPARTEMENTS[0],
+            centre: 'Brand New Centre',
+            date: '2026-08-15',
+            heure: '09:00',
+            isNew: true,
+          },
         ]),
       })
     );

@@ -5,6 +5,7 @@ export interface Creneau {
   centre: string;
   date: string;
   heure: string;
+  isNew?: boolean;
 }
 
 export interface StateFile {

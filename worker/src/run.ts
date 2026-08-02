@@ -2,9 +2,9 @@ import { DEPARTEMENTS, MIN_DELAY_MS, MAX_DELAY_MS } from './config';
 import { shouldRunCheck } from './schedule';
 import { readState, writeState } from './storage';
 import { fetchDepartementCreneaux, randomDelayMs, SessionExpiredError } from './checkSlots';
-import { findNewCreneaux } from './diff';
+import { findNewCreneaux, creneauKey } from './diff';
 import { formatNewCreneauxMessage, sendTelegramNotification } from './notify';
-import type { Creneau } from './types';
+import type { Creneau, StateCreneau } from './types';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +31,7 @@ export async function run(now: Date = new Date()): Promise<void> {
     return;
   }
 
-  const previousCreneaux = previousState ? previousState.creneaux : [];
+  const previousCreneaux: Creneau[] = previousState ? previousState.creneaux : [];
   const allCreneaux: Creneau[] = [];
 
   for (const departement of DEPARTEMENTS) {
@@ -64,8 +64,23 @@ export async function run(now: Date = new Date()): Promise<void> {
     }
   }
 
+  // Reuses the exact "new since last check" computation that drives the
+  // Telegram notification above, so the dashboard's future "Nouveau" badge
+  // and the Telegram alert can never disagree about what counts as new.
+  // The explicit `isNew:` below always wins over whatever a creneau carried
+  // in from the previousCreneaux fallback a few lines up (a departement
+  // whose fetch failed reuses its previous StateCreneau objects, which
+  // already have their own, now-stale, isNew field) -- object spread order
+  // means the later, freshly-computed property always overrides the earlier
+  // spread one.
+  const newKeys = new Set(newCreneaux.map(creneauKey));
+  const storedCreneaux: StateCreneau[] = allCreneaux.map((c) => ({
+    ...c,
+    isNew: newKeys.has(creneauKey(c)),
+  }));
+
   try {
-    await writeState({ creneaux: allCreneaux, lastChecked: now.toISOString() });
+    await writeState({ creneaux: storedCreneaux, lastChecked: now.toISOString() });
   } catch (error) {
     console.error('Failed to write state to Blob:', error);
     process.exitCode = 1;

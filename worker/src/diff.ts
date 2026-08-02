@@ -1,6 +1,6 @@
 import type { Creneau } from './types';
 
-function creneauKey(c: Creneau): string {
+export function creneauKey(c: Creneau): string {
   return `${c.departement}|${c.centre}|${c.date}|${c.heure}`;
 }
 
