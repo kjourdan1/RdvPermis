@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const listboxId = useId();
 
   const selectedSet = new Set(selected);
   const allSelected = selected.length === DEPARTEMENTS.length;
@@ -40,15 +41,30 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
 
   return (
     <div className="space-y-3">
-      <div className="relative">
+      <div
+        className="relative"
+        onFocus={() => setIsOpen(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsOpen(false);
+          }
+        }}
+      >
         <input
           type="text"
+          role="combobox"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setIsOpen(true)}
-          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
           placeholder="Ajouter un département (ex : Rhône, 69, Paris)"
           aria-label="Rechercher un département"
+          aria-expanded={isOpen}
+          aria-controls={listboxId}
+          aria-haspopup="listbox"
           autoComplete="off"
           className="w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
@@ -57,11 +73,16 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
           className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         />
         {isOpen && options.length > 0 && (
-          <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+          <div
+            id={listboxId}
+            role="listbox"
+            className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md"
+          >
             {options.map((d) => (
               <button
                 key={d.code}
                 type="button"
+                role="option"
                 onClick={() => toggle(d.code)}
                 className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
               >
@@ -74,8 +95,8 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
       </div>
       {allSelected ? (
         <p className="text-sm text-muted-foreground">
-          Tous les départements ({DEPARTEMENTS.length}) — recherchez-en un pour n&apos;afficher
-          que celui-là.
+          Tous les départements ({DEPARTEMENTS.length}) — ouvrez la liste ou recherchez-en un pour
+          n&apos;afficher que celui-là.
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
