@@ -1,13 +1,40 @@
 import type { Creneau } from './types';
 
+// Telegram rejects sendMessage calls over 4096 characters, counted in UTF-16
+// code units -- and the emoji used in this format (🚗 📍 📅) are non-BMP,
+// so they count as 2 units each. Budget well below the hard limit rather
+// than computing exactly against it.
+const TELEGRAM_MESSAGE_LIMIT = 4096;
+const TELEGRAM_MESSAGE_SAFETY_MARGIN = 296;
+const MESSAGE_BODY_BUDGET = TELEGRAM_MESSAGE_LIMIT - TELEGRAM_MESSAGE_SAFETY_MARGIN;
+
 export function formatNewCreneauxMessage(creneaux: Creneau[]): string {
   const lines = ['🚗 Nouveau créneau disponible !', ''];
+  let includedCount = 0;
+
   for (const c of creneaux) {
-    lines.push(`📍 Département ${c.departement} — ${c.centre}`);
-    lines.push(`📅 à ${c.heure.replace(':', 'h')} le ${c.date}`);
-    lines.push('');
+    const block = [
+      `📍 Département ${c.departement} — ${c.centre}`,
+      `📅 à ${c.heure.replace(':', 'h')} le ${c.date}`,
+      '',
+    ];
+    const candidateLength = lines.concat(block).join('\n').length;
+    if (candidateLength > MESSAGE_BODY_BUDGET) {
+      break;
+    }
+    lines.push(...block);
+    includedCount++;
   }
-  return lines.join('\n').trim();
+
+  let message = lines.join('\n').trim();
+
+  const omittedCount = creneaux.length - includedCount;
+  if (omittedCount > 0) {
+    const plural = omittedCount > 1;
+    message += `\n\n… et ${omittedCount} autre${plural ? 's' : ''} créneau${plural ? 'x' : ''}.`;
+  }
+
+  return message;
 }
 
 export async function sendTelegramNotification(message: string): Promise<void> {

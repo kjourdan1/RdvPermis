@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { formatNewCreneauxMessage, sendTelegramNotification } from './notify';
+import type { Creneau } from './types';
 
 describe('formatNewCreneauxMessage', () => {
   it('includes the header line', () => {
@@ -18,6 +19,64 @@ describe('formatNewCreneauxMessage', () => {
     expect(message).toContain('à 14h30');
     expect(message).toContain('📍 Département 091 — Centre de Corbeil');
     expect(message).toContain('à 09h00');
+  });
+
+  it('does not truncate or add a footer for a small list that fits comfortably', () => {
+    const message = formatNewCreneauxMessage([
+      { departement: '078', centre: 'Centre de Versailles', date: '2026-08-14', heure: '14:30' },
+      { departement: '091', centre: 'Centre de Corbeil', date: '2026-08-15', heure: '09:00' },
+    ]);
+    expect(message).not.toContain('autre');
+    expect(message.length).toBeLessThan(4096);
+  });
+
+  it('caps the message at the Telegram limit and appends an omitted-count footer when creneaux do not fit', () => {
+    const many: Creneau[] = Array.from({ length: 200 }, (_, i) => ({
+      departement: '078',
+      centre: `Centre ${i}`,
+      date: '2026-08-14',
+      heure: '14:30',
+    }));
+
+    const message = formatNewCreneauxMessage(many);
+
+    expect(message.length).toBeLessThanOrEqual(4096);
+
+    const footerMatch = message.match(/\n\n… et (\d+) autres? créneaux?\.$/);
+    expect(footerMatch).not.toBeNull();
+    const omittedCount = Number(footerMatch![1]);
+    const includedCount = many.length - omittedCount;
+    expect(includedCount).toBeGreaterThan(0);
+    expect(includedCount).toBeLessThan(many.length);
+
+    // Everything that made it in must be formatted exactly as it would be
+    // on its own -- truncation must never change the format of included
+    // creneaux, only stop including more of them.
+    const expectedPrefix = formatNewCreneauxMessage(many.slice(0, includedCount));
+    expect(message.startsWith(expectedPrefix)).toBe(true);
+
+    const plural = omittedCount > 1;
+    expect(
+      message.endsWith(`… et ${omittedCount} autre${plural ? 's' : ''} créneau${plural ? 'x' : ''}.`)
+    ).toBe(true);
+  });
+
+  it('uses correct singular French wording when exactly one creneau is omitted', () => {
+    // Fixed-width centre name so each block is the same length; 68 of these
+    // is exactly one more than fits under the message body budget.
+    const fixed = (n: number): Creneau[] =>
+      Array.from({ length: n }, () => ({
+        departement: '078',
+        centre: 'Centre X',
+        date: '2026-08-14',
+        heure: '14:30',
+      }));
+
+    const message = formatNewCreneauxMessage(fixed(68));
+
+    expect(message.endsWith('… et 1 autre créneau.')).toBe(true);
+    expect(message).not.toContain('autres');
+    expect(message).not.toContain('créneaux.');
   });
 });
 

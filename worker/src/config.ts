@@ -4,8 +4,14 @@
 // Ile-de-France codes, e.g. '078' not '78'). '02A'/'02B' are a best-effort
 // guess at that same 3-character convention for Corse and have not been
 // verified against the live API -- if slot data for Corse never appears,
-// check the real code here first (the fetch failure is silent: run.ts logs
-// it and keeps previous data for that departement, it doesn't break the run).
+// check the real code here first. A generic fetch failure for an unverified
+// code (4xx other than 401/403, 5xx, parse error) is silent and non-fatal:
+// run.ts logs it and keeps previous data for that departement, the run
+// continues. But a 401/403 is NOT: checkSlots.ts maps it to
+// SessionExpiredError, which run.ts treats as immediately fatal for the
+// whole run -- it aborts before writeState is ever called, so a bad code
+// that trips a 401/403 loses that run's state entirely, not just its own
+// departement's data.
 export const DEPARTEMENTS = [
   '001', '002', '003', '004', '005', '006', '007', '008', '009', '010',
   '011', '012', '013', '014', '015', '016', '017', '018', '019',
