@@ -29,8 +29,10 @@ export default async function DashboardPage({
       </p>
       <DepartementFilter selected={selected} />
       <div className="mt-6">
-        {groups.length === 0 ? (
+        {creneaux.length === 0 ? (
           <p className="text-muted-foreground">Aucun créneau disponible pour le moment.</p>
+        ) : groups.length === 0 ? (
+          <p className="text-muted-foreground">Aucun créneau pour les départements sélectionnés.</p>
         ) : (
           groups.map((group) => <CreneauGroup key={group.departement} group={group} />)
         )}
