@@ -16,7 +16,7 @@ OFF=132
 # Always leave a screenshot of the final state behind, success or failure --
 # this is the diagnostic trail if the page layout ever drifts. Picked up as
 # a CI artifact by the workflow, never sent anywhere else.
-trap 'scrot /output/on-exit.png 2>/dev/null || true' EXIT
+trap 'snap on-exit.png 2>/dev/null || scrot /output/on-exit.png 2>/dev/null || true' EXIT
 
 echo '[run] starting Xorg'
 Xorg :0 -noreset -logfile /tmp/xorg.log &
@@ -26,12 +26,28 @@ for i in $(seq 1 20); do
 done
 xdpyinfo >/dev/null 2>&1 || { echo '[run] Xorg failed to start'; cat /tmp/xorg.log; exit 1; }
 echo '[run] Xorg is up'
-# hdmi_force_hotplug=1 + the vc4-kms-v3d overlay on the host (see
-# RPI4B/config_ssh_init_dietpi.md) make the GPU treat HDMI-2 as always
-# connected even with no monitor attached -- real hardware-accelerated
-# rendering, not the software fallback Turnstile can fingerprint.
-xrandr --output HDMI-1 --off --output HDMI-2 --primary --mode 1920x1080 2>/dev/null || true
+# hdmi_force_hotplug:1=1 + hdmi_group:1=1 + hdmi_mode:1=16 on the host (see
+# RPI4B/config_ssh_init_dietpi.md) force HDMI-2 to report 1920x1080 even with
+# no monitor attached -- real hardware-accelerated rendering, not the
+# software fallback Turnstile can fingerprint.
+xrandr --output HDMI-1 --off --output HDMI-2 --primary --mode 1920x1080 2>/tmp/xrandr.log || {
+  echo '[run] WARNING: xrandr failed to set HDMI-2 to 1920x1080:'
+  cat /tmp/xrandr.log
+}
 sleep 1
+
+# Logged explicitly rather than assumed: every coordinate below is calibrated
+# for 1920x1080, and a silent fallback resolution (e.g. Xorg falling back to
+# an EDID-less default) is exactly what broke every run the night the RPi's
+# screen got unplugged -- this line is what would have made that obvious from
+# the CI log alone instead of needing to diff PNG dimensions in the artifact.
+RESOLUTION=$(xdpyinfo | awk '/dimensions:/{print $2}')
+echo "[run] X screen resolution: $RESOLUTION"
+RES_MISMATCH=0
+if [[ "$RESOLUTION" != "1920x1080" ]]; then
+  echo "[run] WARNING: expected 1920x1080, got $RESOLUTION -- all pixel coordinates below will be off target"
+  RES_MISMATCH=1
+fi
 
 source /opt/human-lib.sh
 
@@ -56,6 +72,18 @@ if [[ -z "$WIN" ]]; then
   exit 1
 fi
 echo "[run] chromium window: $WIN"
+
+# Every scrot call goes through here instead of being called directly, so the
+# CI log has a title + resolution breadcrumb next to each screenshot -- lets
+# you tell from the log alone (no artifact download) whether a given step
+# actually landed on the page it thinks it did.
+snap() {
+  local title
+  title=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '?')
+  echo "[run] snapshot $1 -- title: \"$title\" -- resolution: $(xdpyinfo | awk '/dimensions:/{print $2}')"
+  scrot "/output/$1"
+}
+
 # The window can exist before the page has actually rendered (confirmed on
 # the CI runner: the first screenshot came back blank white), and clicking
 # too early lands on whatever partial content happened to render first --
@@ -67,19 +95,19 @@ sleep 5
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
 sleep 0.5
-scrot /output/0-initial.png
+snap 0-initial.png
 
 echo '[run] accepting cookies'
 move_mouse_human 569 $((665+OFF))
 xdotool click 1
 sleep 2.5
-scrot /output/0b-after-cookies.png
+snap 0b-after-cookies.png
 
 echo '[run] scrolling to form'
 xdotool mousemove 500 $((500+OFF))
 for i in 1 2 3 4 5 6; do xdotool click 5; sleep 0.08; done
 sleep 1
-scrot /output/1-form.png
+snap 1-form.png
 
 echo '[run] filling email'
 move_mouse_human 495 $((235+OFF))
@@ -94,24 +122,36 @@ xdotool click 1
 sleep 0.8
 type_human "$PASSWORD"
 sleep 1.2
-scrot /output/2-filled.png
+snap 2-filled.png
 
 echo '[run] clicking turnstile'
 move_mouse_human 453 583
 xdotool click 1
 sleep 4
-scrot /output/3-turnstile.png
+snap 3-turnstile.png
 
 echo '[run] submitting'
 move_mouse_human 632 665
 xdotool click 1
 sleep 10
-scrot /output/4-final.png
+snap 4-final.png
 
 TITLE=$(xdotool getwindowname "$WIN")
 echo "[run] title: $TITLE"
 if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
-  echo '[run] LOGIN FAILED'
+  # Best-effort classification from the signals already on hand (resolution
+  # flag, window title) -- narrows down "LOGIN FAILED" to a known failure
+  # family instead of leaving every occurrence equally mysterious.
+  if [[ "$RES_MISMATCH" == 1 ]]; then
+    REASON='resolution_mismatch (see WARNING above -- coordinates were off target from the start)'
+  elif [[ "$TITLE" == *'Connexion'* ]]; then
+    REASON='still_on_login_page (cookie banner or turnstile click likely missed, or credentials rejected)'
+  elif [[ "$TITLE" == *'FranceConnect'* || "$TITLE" == *'idp.msa.fr'* ]]; then
+    REASON='wrong_provider_redirect (clicked FranceConnect instead of the email/password form)'
+  else
+    REASON='unknown'
+  fi
+  echo "[run] LOGIN FAILED -- reason: $REASON"
   exit 1
 fi
 echo '[run] LOGIN SUCCESS'
@@ -147,11 +187,11 @@ sleep 6
 xdotool mousemove 853 261; xdotool click 1; sleep 1
 xdotool mousemove 830 392; xdotool click 1
 sleep 2
-scrot /output/5-network.png
+snap 5-network.png
 xdotool mousemove 1100 650
 for i in 1 2 3 4 5 6 7 8 9 10 11; do xdotool click 5; sleep 0.1; done
 sleep 0.5
-scrot /output/6-headers-scrolled.png
+snap 6-headers-scrolled.png
 xdotool mousemove 1100 700
 xdotool click --repeat 3 --delay 80 1
 sleep 0.5
