@@ -1,6 +1,6 @@
 import { getLatestState } from '@/lib/state';
 import { parseSelectedDepartements, filterAndGroup } from '@/lib/creneaux';
-import { DepartementFilter } from '@/components/DepartementFilter';
+import { DepartementPicker } from '@/components/DepartementPicker';
 import { CreneauGroup } from '@/components/CreneauGroup';
 
 export const revalidate = 120;
@@ -27,7 +27,7 @@ export default async function DashboardPage({
           ? new Date(lastChecked).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
           : 'jamais'}
       </p>
-      <DepartementFilter selected={selected} />
+      <DepartementPicker selected={selected} />
       <div className="mt-6">
         {creneaux.length === 0 ? (
           <p className="text-muted-foreground">Aucun créneau disponible pour le moment.</p>
