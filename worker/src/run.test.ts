@@ -217,4 +217,29 @@ describe('run', () => {
       })
     );
   });
+
+  it('recomputes isNew for a fallback-copied creneau instead of keeping its stale value', async () => {
+    const stale = {
+      departement: DEPARTEMENTS[0],
+      centre: 'Old Centre',
+      date: '2026-08-14',
+      heure: '14:30',
+      isNew: true, // stored as new last run -- this run it's neither new nor absent, so must become false
+    };
+    mocks.readState.mockResolvedValue({ creneaux: [stale], lastChecked: null });
+    mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
+      if (dep === DEPARTEMENTS[0]) {
+        throw new Error('network error'); // forces the previousCreneaux fallback path
+      }
+      return [];
+    });
+
+    await run(NOW);
+
+    expect(mocks.writeState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creneaux: expect.arrayContaining([{ ...stale, isNew: false }]),
+      })
+    );
+  });
 });
