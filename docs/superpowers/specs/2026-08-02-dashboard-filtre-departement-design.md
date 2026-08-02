@@ -17,6 +17,11 @@ toutes les lignes.
 - **Rafraîchissement automatique côté navigateur** : la page reste 100% Server Component ; les
   données restent à jour au prochain chargement grâce à `revalidate = 120` déjà en place. Pas de
   polling client.
+  - **Note** : la lecture de `searchParams` (pour le filtre département) rend la route entièrement
+    dynamique — elle n'est plus statiquement re-générée toutes les 120s. Le `list()` Vercel Blob
+    s'exécute donc désormais à chaque requête plutôt que toutes les 120s, même si le `fetch` JSON
+    sous-jacent dans `lib/state.ts` reste Data-Cached à 120s. Compromis identifié et accepté en
+    revue, pas un oubli.
 - **Notion de "nouveau créneau"** : pas disponible sans changement worker (le diff "nouveau" existe
   déjà côté worker pour Telegram, mais n'est pas persisté dans le Blob). Le surlignage vert actuel,
   appliqué à toutes les lignes sans distinction, est donc supprimé plutôt que corrigé.
