@@ -4,6 +4,11 @@ export interface DepartementInfo {
   name: string;
 }
 
+// Fold diacritics so "rhone" matches "Rhône", "ardeche" matches "Ardèche".
+export function foldForSearch(value: string): string {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 export const DEPARTEMENTS: DepartementInfo[] = [
   { code: '001', name: 'Ain' },
   { code: '002', name: 'Aisne' },

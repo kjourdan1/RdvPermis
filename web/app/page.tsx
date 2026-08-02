@@ -26,7 +26,7 @@ export default async function DashboardPage({
       <header className="bg-primary px-4 pb-4 pt-5 text-primary-foreground">
         <div className="mx-auto flex max-w-3xl items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-secondary to-primary-foreground/20 text-sm font-bold">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-secondary to-primary-foreground/20 text-sm font-bold text-primary">
               RP
             </div>
             <div>

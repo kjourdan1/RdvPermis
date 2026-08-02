@@ -27,7 +27,9 @@ export function CreneauGroup({ group }: { group: CreneauGroupData }) {
             <TableHead>Centre</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Heure</TableHead>
-            <TableHead />
+            <TableHead>
+              <span className="sr-only">Statut</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

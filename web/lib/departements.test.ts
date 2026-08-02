@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEPARTEMENTS } from './departements';
+import { DEPARTEMENTS, foldForSearch } from './departements';
 
 describe('DEPARTEMENTS', () => {
   it('has exactly 101 entries with no duplicate codes', () => {
@@ -27,5 +27,16 @@ describe('DEPARTEMENTS', () => {
     expect(byCode['090']).toBe('Territoire de Belfort');
     expect(byCode['971']).toBe('Guadeloupe');
     expect(byCode['976']).toBe('Mayotte');
+  });
+});
+
+describe('foldForSearch', () => {
+  it('strips accents and lowercases', () => {
+    expect(foldForSearch('Rhône')).toBe('rhone');
+    expect(foldForSearch("Côte-d'Or")).toBe("cote-d'or");
+  });
+
+  it('produces an unaccented, lowercase haystack for every department name', () => {
+    expect(DEPARTEMENTS.every((d) => /^[a-z0-9 '-]+$/.test(foldForSearch(d.name)))).toBe(true);
   });
 });
