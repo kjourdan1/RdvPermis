@@ -1,52 +1,42 @@
-import { getLatestState } from '../lib/state';
+import { getLatestState } from '@/lib/state';
+import { parseSelectedDepartements, filterAndGroup } from '@/lib/creneaux';
+import { DepartementFilter } from '@/components/DepartementFilter';
+import { CreneauGroup } from '@/components/CreneauGroup';
 
 export const revalidate = 120;
 
-function formatHeure(heure: string): string {
-  return heure.replace(':', 'h');
-}
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dep?: string }>;
+}) {
+  const { dep } = await searchParams;
+  const selected = parseSelectedDepartements(dep);
 
-export default async function DashboardPage() {
   const state = await getLatestState();
   const creneaux = state?.creneaux ?? [];
   const lastChecked = state?.lastChecked;
+  const groups = filterAndGroup(creneaux, selected);
 
   return (
-    <main style={{ fontFamily: 'sans-serif', padding: '1.5rem', maxWidth: '800px', margin: '0 auto' }}>
-      <h1>RdvPermis-IDF — Créneaux disponibles</h1>
-      <p>
+    <main className="mx-auto max-w-3xl p-6">
+      <h1 className="mb-1 text-2xl font-bold">RdvPermis-IDF — Créneaux disponibles</h1>
+      <p className="mb-4 text-sm text-muted-foreground">
         Dernière vérification :{' '}
         {lastChecked
           ? new Date(lastChecked).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
           : 'jamais'}
       </p>
-      {creneaux.length === 0 ? (
-        <p>Aucun créneau disponible pour le moment.</p>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Département</th>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Centre</th>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Date</th>
-              <th style={{ textAlign: 'left', borderBottom: '1px solid #ccc' }}>Heure</th>
-            </tr>
-          </thead>
-          <tbody>
-            {creneaux.map((c, i) => (
-              <tr
-                key={`${c.departement}-${c.centre}-${c.date}-${c.heure}-${i}`}
-                style={{ backgroundColor: '#e6ffed' }}
-              >
-                <td>{c.departement}</td>
-                <td>{c.centre}</td>
-                <td>{new Date(`${c.date}T00:00:00`).toLocaleDateString('fr-FR')}</td>
-                <td>{formatHeure(c.heure)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <DepartementFilter selected={selected} />
+      <div className="mt-6">
+        {creneaux.length === 0 ? (
+          <p className="text-muted-foreground">Aucun créneau disponible pour le moment.</p>
+        ) : groups.length === 0 ? (
+          <p className="text-muted-foreground">Aucun créneau pour les départements sélectionnés.</p>
+        ) : (
+          groups.map((group) => <CreneauGroup key={group.departement} group={group} />)
+        )}
+      </div>
     </main>
   );
 }
