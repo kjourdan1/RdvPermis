@@ -63,7 +63,7 @@ Deux options :
   git clone https://github.com/kjourdan1/RdvPermis.git
   cd RdvPermis
   rm -rf .git && git init
-  gh repo create RdvPermis-IDF --public --source=. --remote=origin --push
+  gh repo create RdvPermis --public --source=. --remote=origin --push
   ```
   Remplacer `--public` par `--private` si le repo doit rester privé (voir la contrainte ci-dessus) :
   cela ne dispense pas d'installer un runner self-hosted.

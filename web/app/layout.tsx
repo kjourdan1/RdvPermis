@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'RdvPermis-IDF',
+  title: 'RdvPermis',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

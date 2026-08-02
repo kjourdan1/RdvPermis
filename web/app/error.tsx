@@ -10,7 +10,7 @@ export default function Error({
 }) {
   return (
     <main className="mx-auto max-w-3xl p-6">
-      <h1 className="mb-2 text-2xl font-bold">RdvPermis-IDF</h1>
+      <h1 className="mb-2 text-2xl font-bold">RdvPermis</h1>
       <p className="mb-4 text-muted-foreground">
         Impossible de charger les créneaux pour le moment, réessaie dans quelques instants.
       </p>
