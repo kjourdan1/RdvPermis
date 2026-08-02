@@ -3,6 +3,8 @@ import { getLatestState } from '@/lib/state';
 import { parseSelectedDepartements, filterAndGroup } from '@/lib/creneaux';
 import { DepartementPicker } from '@/components/DepartementPicker';
 import { CreneauGroup } from '@/components/CreneauGroup';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export const revalidate = 120;
 
@@ -23,15 +25,15 @@ export default async function DashboardPage({
   return (
     <>
       <div className="h-1 w-full bg-gradient-to-r from-primary via-white to-destructive" />
-      <header className="bg-primary px-4 pb-4 pt-5 text-primary-foreground">
+      <header className="border-b border-border bg-card px-4 pb-4 pt-5">
         <div className="mx-auto flex max-w-3xl items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-secondary to-primary-foreground/20 text-sm font-bold text-primary">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-primary">
               RP
             </div>
             <div>
-              <h1 className="text-base font-semibold leading-tight">RdvPermis</h1>
-              <p className="text-xs text-primary-foreground/70">
+              <h1 className="text-base font-bold leading-tight text-foreground">RdvPermis</h1>
+              <p className="text-xs text-muted-foreground">
                 Suivi des places d&apos;examen du permis de conduire
               </p>
             </div>
@@ -40,17 +42,26 @@ export default async function DashboardPage({
             href="https://github.com/kjourdan1/RdvPermis"
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 whitespace-nowrap rounded-full border border-primary-foreground/25 px-3 py-1.5 text-xs text-primary-foreground/90 hover:bg-primary-foreground/10"
+            className="shrink-0 whitespace-nowrap rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           >
             GitHub ↗
           </Link>
         </div>
-        <div className="mx-auto mt-3 max-w-3xl rounded-md border border-primary-foreground/15 bg-primary-foreground/10 p-2.5 text-[11.5px] leading-relaxed text-primary-foreground/80">
+        <div className="mx-auto mt-3 max-w-3xl rounded-md border border-border bg-muted p-2.5 text-[11.5px] leading-relaxed text-muted-foreground">
           Projet communautaire indépendant, non affilié à l&apos;État ni à l&apos;ANTS.
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl p-6">
+        <Link
+          href="https://candidat.permisdeconduire.gouv.fr/reservation"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({ size: 'lg' }), 'mb-6 w-full')}
+        >
+          Réserver mon examen ↗
+        </Link>
+
         <div className="mb-6 grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-border bg-card p-3 shadow-sm">
             <div className="text-2xl font-bold text-primary">{totalSlotsShown}</div>
