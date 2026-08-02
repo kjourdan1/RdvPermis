@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DEPARTEMENTS, foldForSearch } from '@/lib/departements';
 import { buildFilterHref } from '@/lib/creneaux';
@@ -14,18 +15,18 @@ const SEARCH_INDEX = DEPARTEMENTS.map((d) => ({
 export function DepartementPicker({ selected }: { selected: string[] }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
 
   const selectedSet = new Set(selected);
   const allSelected = selected.length === DEPARTEMENTS.length;
   const selectedInfo = DEPARTEMENTS.filter((d) => selectedSet.has(d.code));
 
   const trimmedQuery = foldForSearch(query.trim());
-  const suggestions =
-    trimmedQuery === ''
-      ? []
-      : SEARCH_INDEX.filter(
-          (d) => (allSelected || !selectedSet.has(d.code)) && d.haystack.includes(trimmedQuery)
-        ).slice(0, 8);
+  const options = SEARCH_INDEX.filter(
+    (d) =>
+      (allSelected || !selectedSet.has(d.code)) &&
+      (trimmedQuery === '' || d.haystack.includes(trimmedQuery))
+  );
 
   function toggle(code: string) {
     if (allSelected) {
@@ -34,6 +35,7 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
       router.push(buildFilterHref(selected, code));
     }
     setQuery('');
+    setIsOpen(false);
   }
 
   return (
@@ -43,14 +45,20 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => setTimeout(() => setIsOpen(false), 150)}
           placeholder="Ajouter un département (ex : Rhône, 69, Paris)"
           aria-label="Rechercher un département"
           autoComplete="off"
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+          className="w-full rounded-md border border-input bg-background px-3 py-2 pr-8 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
-        {suggestions.length > 0 && (
+        <ChevronDown
+          aria-hidden="true"
+          className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+        />
+        {isOpen && options.length > 0 && (
           <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-            {suggestions.map((d) => (
+            {options.map((d) => (
               <button
                 key={d.code}
                 type="button"
