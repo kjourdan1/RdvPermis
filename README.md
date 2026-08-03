@@ -12,6 +12,25 @@ Deux façons de suivre les alertes :
 - **Le groupe Telegram**, qui reçoit les mêmes alertes en temps réel dès qu'un créneau réellement
   nouveau apparaît : <https://t.me/+AnbsHQuoFiRlODQ0>
 
+## Dashboard
+
+![Dashboard RdvPermis](docs/screenshot-dashboard.png)
+
+Le dashboard (<https://web-delta-seven-90.vercel.app>) affiche, pour les départements sélectionnés,
+les créneaux disponibles groupés par département, avec :
+
+- un badge « Nouveau » sur les créneaux détectés depuis la dernière vérification ;
+- un sélecteur de département en liste déroulante (recherche par nom ou code, pliage des accents —
+  taper « rhone » trouve « Rhône ») ;
+- un raccourci « Île-de-France + départements voisins » épinglé en tête de cette liste, qui
+  remplace la sélection courante par l'IDF et les 8 départements limitrophes en un clic ;
+- un bouton « Réserver mon examen », qui renvoie directement vers l'espace candidat officiel
+  (<https://candidat.permisdeconduire.gouv.fr/reservation>) — ce dashboard ne réserve rien
+  lui-même, il ne fait que signaler la disponibilité.
+
+La sélection de départements est portée par l'URL (`?dep=075,077,...`), donc partageable telle
+quelle : envoyer un lien avec sa propre sélection à quelqu'un d'autre lui affiche la même vue.
+
 ## Sécurité
 
 - L'email, le mot de passe, le cookie de session, et tout autre identifiant ne sont **jamais**
@@ -73,25 +92,6 @@ Cette approche fonctionne, mais deux points sont à garder en tête si vous la r
 - Elle nécessite un **vrai GPU accessible en passthrough** au conteneur (pas de VM sur ce genre de
   matériel : pas de passthrough GPU propre, retombe sur du logiciel). Voir « Étape 3 » plus bas pour
   les prérequis matériels et la configuration du Raspberry Pi.
-
-## Dashboard
-
-![Dashboard RdvPermis](docs/screenshot-dashboard.png)
-
-Le dashboard (<https://web-delta-seven-90.vercel.app>) affiche, pour les départements sélectionnés,
-les créneaux disponibles groupés par département, avec :
-
-- un badge « Nouveau » sur les créneaux détectés depuis la dernière vérification ;
-- un sélecteur de département en liste déroulante (recherche par nom ou code, pliage des accents —
-  taper « rhone » trouve « Rhône ») ;
-- un raccourci « Île-de-France + départements voisins » épinglé en tête de cette liste, qui
-  remplace la sélection courante par l'IDF et les 8 départements limitrophes en un clic ;
-- un bouton « Réserver mon examen », qui renvoie directement vers l'espace candidat officiel
-  (<https://candidat.permisdeconduire.gouv.fr/reservation>) — ce dashboard ne réserve rien
-  lui-même, il ne fait que signaler la disponibilité.
-
-La sélection de départements est portée par l'URL (`?dep=075,077,...`), donc partageable telle
-quelle : envoyer un lien avec sa propre sélection à quelqu'un d'autre lui affiche la même vue.
 
 ## Déployer sa propre instance
 
