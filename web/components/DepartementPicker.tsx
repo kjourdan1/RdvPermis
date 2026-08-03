@@ -2,7 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SELECTABLE_DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from '@/lib/departements';
 import { buildFilterHref } from '@/lib/creneaux';
@@ -30,21 +30,22 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
   const selectedInfo = SELECTABLE_DEPARTEMENTS.filter((d) => selectedSet.has(d.code));
 
   const trimmedQuery = foldForSearch(query.trim());
+  // Every matching departement stays listed regardless of selection state --
+  // the checkbox next to it is what shows/toggles whether it's selected, so
+  // items can't disappear out from under a user mid multi-select.
   const options = SEARCH_INDEX.filter(
-    (d) =>
-      (allSelected || !selectedSet.has(d.code)) &&
-      (trimmedQuery === '' || d.haystack.includes(trimmedQuery))
+    (d) => trimmedQuery === '' || d.haystack.includes(trimmedQuery)
   );
   const showIdfPreset = matchesIdfPreset(trimmedQuery);
 
   function toggle(code: string) {
-    if (allSelected) {
-      router.push(`?dep=${code}`);
-    } else {
-      router.push(buildFilterHref(selected, code));
-    }
-    setQuery('');
-    setIsOpen(false);
+    // Always a plain toggle against the current selection (add if absent,
+    // remove if present) so each checkbox only ever affects its own
+    // departement -- no "starting from all-selected replaces the whole
+    // selection" shortcut, which would fight the checkbox's own checked
+    // state. The dropdown stays open so several departements can be
+    // checked in one pass.
+    router.push(buildFilterHref(selected, code));
   }
 
   function applyPreset(codes: string[]) {
@@ -90,6 +91,7 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
           <div
             id={listboxId}
             role="listbox"
+            aria-multiselectable="true"
             className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md"
           >
             {showIdfPreset && (
@@ -102,25 +104,39 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
                 {IDF_PRESET_LABEL}
               </button>
             )}
-            {options.map((d) => (
-              <button
-                key={d.code}
-                type="button"
-                role="option"
-                onClick={() => toggle(d.code)}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
-              >
-                <span className="mr-1.5 text-muted-foreground">{d.code}</span>
-                {d.name}
-              </button>
-            ))}
+            {options.map((d) => {
+              const isChecked = selectedSet.has(d.code);
+              return (
+                <button
+                  key={d.code}
+                  type="button"
+                  role="option"
+                  aria-selected={isChecked}
+                  onClick={() => toggle(d.code)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`flex size-4 shrink-0 items-center justify-center rounded-sm border ${
+                      isChecked
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input'
+                    }`}
+                  >
+                    {isChecked && <Check className="size-3" />}
+                  </span>
+                  <span className="mr-1.5 text-muted-foreground">{d.code}</span>
+                  {d.name}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
       {allSelected ? (
         <p className="text-sm text-muted-foreground">
-          Tous les départements ({SELECTABLE_DEPARTEMENTS.length}) — ouvrez la liste ou recherchez-en un pour
-          n&apos;afficher que celui-là.
+          Tous les départements ({SELECTABLE_DEPARTEMENTS.length}) — ouvrez la liste et décochez
+          ceux que vous ne voulez pas voir.
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
