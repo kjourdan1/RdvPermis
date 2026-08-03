@@ -25,7 +25,7 @@ vi.mock('./notify', () => ({
 }));
 
 import { run } from './run';
-import { SessionExpiredError } from './checkSlots';
+import { SessionExpiredError, RateLimitedError } from './checkSlots';
 import { DEPARTEMENTS } from './config';
 
 const NOW = new Date('2026-01-15T09:00:00Z'); // 10:00 Paris, off-peak
@@ -128,6 +128,22 @@ describe('run', () => {
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
       if (dep === DEPARTEMENTS[0]) {
         throw new SessionExpiredError(dep);
+      }
+      return [];
+    });
+
+    await run(NOW);
+
+    expect(process.exitCode).toBe(1);
+    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(1);
+    expect(mocks.writeState).not.toHaveBeenCalled();
+  });
+
+  it('stops immediately and sets exitCode to 1 on RateLimitedError, without writing state', async () => {
+    mocks.readState.mockResolvedValue(null);
+    mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
+      if (dep === DEPARTEMENTS[0]) {
+        throw new RateLimitedError(dep);
       }
       return [];
     });

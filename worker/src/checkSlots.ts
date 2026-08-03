@@ -11,6 +11,17 @@ export class SessionExpiredError extends Error {
   }
 }
 
+// Thrown on a 429: the site has just told us, in plain terms, to slow down.
+// Retrying immediately (like the generic transient-failure path below) would
+// only add to the flood; run.ts treats this as fatal for the whole run
+// instead of ploughing through the remaining departements one by one.
+export class RateLimitedError extends Error {
+  constructor(departement: string) {
+    super(`Rate limited while fetching departement ${departement}`);
+    this.name = 'RateLimitedError';
+  }
+}
+
 interface RawCentre {
   nom: string;
 }
@@ -108,6 +119,9 @@ export async function fetchDepartementCreneaux(
     if (status === 401 || status === 403) {
       throw new SessionExpiredError(departement);
     }
+    if (status === 429) {
+      throw new RateLimitedError(departement);
+    }
     if (status < 200 || status >= 300) {
       throw new Error(`Creneaux API returned ${status} for departement ${departement}`);
     }
@@ -117,7 +131,7 @@ export async function fetchDepartementCreneaux(
   try {
     return await attempt();
   } catch (error) {
-    if (error instanceof SessionExpiredError) {
+    if (error instanceof SessionExpiredError || error instanceof RateLimitedError) {
       throw error;
     }
     return await attempt();

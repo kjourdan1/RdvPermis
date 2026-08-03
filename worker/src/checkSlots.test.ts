@@ -13,6 +13,7 @@ import {
   fetchDepartementCreneaux,
   randomDelayMs,
   SessionExpiredError,
+  RateLimitedError,
 } from './checkSlots';
 
 // execFile is promisified via node:util's callback-style wrapping, so the
@@ -119,6 +120,14 @@ describe('fetchDepartementCreneaux', () => {
     mockCurlResult(403, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
       SessionExpiredError
+    );
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws RateLimitedError immediately on a 429, without retrying', async () => {
+    mockCurlResult(429, '');
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
+      RateLimitedError
     );
     expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });

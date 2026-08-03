@@ -1,7 +1,12 @@
 import { DEPARTEMENTS, MIN_DELAY_MS, MAX_DELAY_MS } from './config';
 import { shouldRunCheck } from './schedule';
 import { readState, writeState } from './storage';
-import { fetchDepartementCreneaux, randomDelayMs, SessionExpiredError } from './checkSlots';
+import {
+  fetchDepartementCreneaux,
+  randomDelayMs,
+  SessionExpiredError,
+  RateLimitedError,
+} from './checkSlots';
 import { findNewCreneaux, creneauKey } from './diff';
 import { formatNewCreneauxMessage, sendTelegramNotification } from './notify';
 import type { Creneau, StateCreneau } from './types';
@@ -45,6 +50,15 @@ export async function run(now: Date = new Date()): Promise<void> {
         // something is genuinely wrong rather than routine session aging --
         // not worth retrying with the same cookie.
         console.error(`Session rejected while fetching departement ${departement}:`, error);
+        process.exitCode = 1;
+        return;
+      }
+      if (error instanceof RateLimitedError) {
+        // Ploughing through the rest of DEPARTEMENTS would just rack up more
+        // 429s against a limit the site just told us we've hit -- stop here
+        // and leave the rest of this run's data as previousCreneaux, same as
+        // the SessionExpiredError path above.
+        console.error(`Rate limited while fetching departement ${departement}:`, error);
         process.exitCode = 1;
         return;
       }
