@@ -15,9 +15,15 @@ export class SessionExpiredError extends Error {
 // Retrying immediately (like the generic transient-failure path below) would
 // only add to the flood; run.ts treats this as fatal for the whole run
 // instead of ploughing through the remaining departements one by one.
+// Carries whatever the response actually said (Retry-After header, body
+// snippet) so a CI log answers "when can we try again?" instead of just
+// "we got a 429" -- see curlGet for where these come from.
 export class RateLimitedError extends Error {
-  constructor(departement: string) {
-    super(`Rate limited while fetching departement ${departement}`);
+  constructor(departement: string, retryAfter: string | undefined, bodySnippet: string) {
+    const retryInfo = retryAfter ? `, Retry-After: ${retryAfter}` : ', no Retry-After header';
+    super(
+      `Rate limited while fetching departement ${departement}${retryInfo} -- body: ${bodySnippet}`
+    );
     this.name = 'RateLimitedError';
   }
 }
@@ -93,18 +99,30 @@ const API_HEADERS = {
 async function curlGet(
   url: string,
   headers: Record<string, string>
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; responseHeaders: Record<string, string> }> {
   const headerArgs = Object.entries(headers).flatMap(([key, value]) => ['-H', `${key}: ${value}`]);
+  // -i prepends the response headers to the body, so a Retry-After (or
+  // whatever else the site sends alongside a 429) is captured too, not just
+  // the status code.
   const { stdout } = await execFileAsync(
     'curl',
-    ['-s', '-o', '-', '-w', '\n%{http_code}', ...headerArgs, url],
+    ['-s', '-i', '-o', '-', '-w', '\n%{http_code}', ...headerArgs, url],
     { maxBuffer: 10 * 1024 * 1024 }
   );
   const splitAt = stdout.lastIndexOf('\n');
-  return {
-    body: stdout.slice(0, splitAt),
-    status: Number(stdout.slice(splitAt + 1).trim()),
-  };
+  const status = Number(stdout.slice(splitAt + 1).trim());
+  const headersAndBody = stdout.slice(0, splitAt);
+  const boundary = headersAndBody.search(/\r\n\r\n|\n\n/);
+  const rawHeaders = boundary === -1 ? '' : headersAndBody.slice(0, boundary);
+  const body = boundary === -1 ? headersAndBody : headersAndBody.slice(boundary).replace(/^(\r\n\r\n|\n\n)/, '');
+  const responseHeaders: Record<string, string> = {};
+  for (const line of rawHeaders.split(/\r\n|\n/).slice(1)) {
+    const colon = line.indexOf(':');
+    if (colon > 0) {
+      responseHeaders[line.slice(0, colon).trim().toLowerCase()] = line.slice(colon + 1).trim();
+    }
+  }
+  return { body, status, responseHeaders };
 }
 
 export async function fetchDepartementCreneaux(
@@ -112,15 +130,15 @@ export async function fetchDepartementCreneaux(
   cookieHeader: string
 ): Promise<Creneau[]> {
   const attempt = async (): Promise<Creneau[]> => {
-    const { status, body } = await curlGet(`${API_BASE}?code-departement=${departement}`, {
-      ...API_HEADERS,
-      Cookie: cookieHeader,
-    });
+    const { status, body, responseHeaders } = await curlGet(
+      `${API_BASE}?code-departement=${departement}`,
+      { ...API_HEADERS, Cookie: cookieHeader }
+    );
     if (status === 401 || status === 403) {
       throw new SessionExpiredError(departement);
     }
     if (status === 429) {
-      throw new RateLimitedError(departement);
+      throw new RateLimitedError(departement, responseHeaders['retry-after'], body.slice(0, 300));
     }
     if (status < 200 || status >= 300) {
       throw new Error(`Creneaux API returned ${status} for departement ${departement}`);
