@@ -41,13 +41,9 @@ Deux façons de suivre les alertes :
   authentification.
 
 > **Avertissement — rate limit côté site.** L'API interne des créneaux est utilisable une fois
-> authentifié, mais le site applique son propre contrôle anti-abus par compte (« Nombre maximum de
-> requêtes atteint »). Le worker a couvert les 101 départements français un temps, mais s'est fait
-> bloquer le 2026-08-03 en les interrogeant tous toutes les 15 minutes en heures de pointe — voir
-> `docs/sessions/` pour le détail de l'incident. Il n'existe à ce jour aucun contournement connu de
-> cette limite (et ce n'est pas l'objectif de ce projet : voir « Sécurité » ci-dessus). En son
-> absence, le périmètre est donc volontairement réduit à l'Île-de-France et aux départements
-> limitrophes plutôt qu'aux 101 départements.
+> authentifié, mais le site applique son propre contrôle anti-abus par compte. Impossible donc
+> d'interroger les 101 départements français ; le périmètre est réduit à l'Île-de-France et aux
+> départements limitrophes.
 
 ### Le conteneur de login
 
