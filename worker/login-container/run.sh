@@ -178,7 +178,13 @@ xdotool mousemove 1038 157; xdotool click 1; sleep 1
 # request row -- both steps that were racing ahead of the real page state
 # on the CI runner (see the two timing fixes above this one).
 xdotool mousemove 95 63; xdotool click 1
-sleep 6
+# Was `sleep 6`, bumped after three straight failures one evening (all with
+# an empty Network panel in the diagnostics -- "Currently recording network
+# activity", meaning the reload hadn't produced a single request yet) right
+# after two clean runs earlier the same afternoon with the same code. Same
+# site, same script, same day -- the site itself was just slower to respond
+# that evening, not a coordinates issue.
+sleep 15
 # Filter to "Doc" requests only first: by the time we get here there can be
 # dozens of requests loaded (fonts, scripts, images...), so a fixed pixel
 # position for "the top row" isn't reliable -- it hit a font file's row in
