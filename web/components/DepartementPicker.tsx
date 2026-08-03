@@ -4,10 +4,10 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from '@/lib/departements';
+import { SELECTABLE_DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from '@/lib/departements';
 import { buildFilterHref } from '@/lib/creneaux';
 
-const SEARCH_INDEX = DEPARTEMENTS.map((d) => ({
+const SEARCH_INDEX = SELECTABLE_DEPARTEMENTS.map((d) => ({
   ...d,
   haystack: `${foldForSearch(d.name)} ${d.code.toLowerCase()}`,
 }));
@@ -26,8 +26,8 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
   const listboxId = useId();
 
   const selectedSet = new Set(selected);
-  const allSelected = selected.length === DEPARTEMENTS.length;
-  const selectedInfo = DEPARTEMENTS.filter((d) => selectedSet.has(d.code));
+  const allSelected = selected.length === SELECTABLE_DEPARTEMENTS.length;
+  const selectedInfo = SELECTABLE_DEPARTEMENTS.filter((d) => selectedSet.has(d.code));
 
   const trimmedQuery = foldForSearch(query.trim());
   const options = SEARCH_INDEX.filter(
@@ -119,7 +119,7 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
       </div>
       {allSelected ? (
         <p className="text-sm text-muted-foreground">
-          Tous les départements ({DEPARTEMENTS.length}) — ouvrez la liste ou recherchez-en un pour
+          Tous les départements ({SELECTABLE_DEPARTEMENTS.length}) — ouvrez la liste ou recherchez-en un pour
           n&apos;afficher que celui-là.
         </p>
       ) : (

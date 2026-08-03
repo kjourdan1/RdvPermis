@@ -1,8 +1,11 @@
 // web/lib/creneaux.ts
 import type { Creneau } from './state';
-import { DEPARTEMENTS as DEPARTEMENTS_INFO } from './departements';
+import { SELECTABLE_DEPARTEMENTS } from './departements';
 
-export const DEPARTEMENTS = DEPARTEMENTS_INFO.map((d) => d.code);
+// Codes the worker actually checks (see SELECTABLE_DEPARTEMENTS) -- what
+// "all departements" defaults to and what a `?dep=` param gets filtered
+// against, so an unchecked code can't be selected via a hand-crafted URL.
+export const DEPARTEMENTS = SELECTABLE_DEPARTEMENTS.map((d) => d.code);
 
 export interface CreneauGroupData {
   departement: string;

@@ -120,3 +120,12 @@ export const IDF_ET_VOISINS: string[] = [
   '075', '077', '078', '091', '092', '093', '094', '095',
   '002', '010', '027', '028', '045', '051', '060', '089',
 ];
+
+// The only departements worker/src/config.ts actually checks -- DEPARTEMENTS
+// above stays the full 101-entry reference list (still needed to name any
+// code that shows up in state), but nothing outside this set will ever get
+// fresh data, so the picker offers only these to avoid suggesting dead
+// choices. See worker/src/config.ts for why the scope was cut down.
+export const SELECTABLE_DEPARTEMENTS: DepartementInfo[] = IDF_ET_VOISINS.map(
+  (code) => DEPARTEMENTS.find((d) => d.code === code)!
+);

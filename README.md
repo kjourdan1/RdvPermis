@@ -1,10 +1,10 @@
 # RdvPermis
 
 Vérification automatique des créneaux d'examen du permis de conduire en candidat libre
-(candidat.permisdeconduire.gouv.fr) sur les **101 départements français**. Le service détecte et
-affiche les disponibilités, y compris les nouvelles depuis la dernière vérification, mais ne
-réserve rien automatiquement : c'est à l'utilisateur d'aller réserver lui-même une fois un créneau
-repéré.
+(candidat.permisdeconduire.gouv.fr) sur les **8 départements d'Île-de-France et leurs 8
+départements limitrophes** (16 au total). Le service détecte et affiche les disponibilités, y
+compris les nouvelles depuis la dernière vérification, mais ne réserve rien automatiquement : c'est
+à l'utilisateur d'aller réserver lui-même une fois un créneau repéré.
 
 Deux façons de suivre les alertes :
 
@@ -35,8 +35,11 @@ Deux façons de suivre les alertes :
 - `worker/` s'exécute uniquement dans un workflow GitHub Actions planifié (toutes les 15 min en
   heures de pointe, une fois par heure le reste du temps). Il obtient un cookie de session valide
   via un conteneur de login dédié (voir ci-dessous), interroge l'API interne des créneaux pour
-  chacun des 101 départements, notifie sur Telegram les créneaux réellement nouveaux, et écrit
-  l'état complet dans Vercel Blob.
+  chacun des 16 départements d'Île-de-France + limitrophes, notifie sur Telegram les créneaux
+  réellement nouveaux, et écrit l'état complet dans Vercel Blob. Le périmètre a couvert les 101
+  départements français un temps, mais a été ramené à l'IDF + voisins le 2026-08-03 après que le
+  compte s'est fait bloquer par le contrôle anti-abus du site lui-même (« Nombre maximum de
+  requêtes atteint ») — voir `docs/sessions/` pour le détail de l'incident.
 - `web/` est un dashboard Next.js déployé sur Vercel qui lit cet état et l'affiche, sans
   authentification.
 

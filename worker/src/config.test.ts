@@ -7,28 +7,17 @@ import {
 } from './config';
 
 describe('config', () => {
-  it('lists all 101 French departements as zero-padded, 3-character codes with no duplicates', () => {
-    expect(DEPARTEMENTS).toHaveLength(101);
-    expect(new Set(DEPARTEMENTS).size).toBe(101);
+  it('lists the 16 Ile-de-France + neighboring departements as zero-padded, 3-character codes with no duplicates', () => {
+    expect(DEPARTEMENTS).toHaveLength(16);
+    expect(new Set(DEPARTEMENTS).size).toBe(16);
     expect(DEPARTEMENTS.every((d) => d.length === 3)).toBe(true);
   });
 
-  it('includes the original 10 Ile-de-France departements this project started with', () => {
-    for (const dep of ['078', '091', '092', '093', '094', '095', '027', '028', '060', '045']) {
-      expect(DEPARTEMENTS).toContain(dep);
-    }
-  });
-
-  it('includes metropolitan edge cases: first and last numeric codes, and Corse', () => {
-    expect(DEPARTEMENTS).toContain('001'); // Ain
-    expect(DEPARTEMENTS).toContain('095'); // Val-d'Oise, last numeric metropolitan code
-    expect(DEPARTEMENTS).toContain('02A'); // Corse-du-Sud
-    expect(DEPARTEMENTS).toContain('02B'); // Haute-Corse
-    expect(DEPARTEMENTS).not.toContain('020'); // "20" does not exist as a department -- split into 2A/2B
-  });
-
-  it('includes all five overseas departements', () => {
-    for (const dep of ['971', '972', '973', '974', '976']) {
+  it('includes all 8 Ile-de-France departements and their 8 bordering departements', () => {
+    for (const dep of [
+      '075', '077', '078', '091', '092', '093', '094', '095',
+      '002', '010', '027', '028', '045', '051', '060', '089',
+    ]) {
       expect(DEPARTEMENTS).toContain(dep);
     }
   });
