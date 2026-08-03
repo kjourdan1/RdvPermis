@@ -36,20 +36,24 @@ Deux façons de suivre les alertes :
   heures de pointe, une fois par heure le reste du temps). Il obtient un cookie de session valide
   via un conteneur de login dédié (voir ci-dessous), interroge l'API interne des créneaux pour
   chacun des 16 départements d'Île-de-France + limitrophes, notifie sur Telegram les créneaux
-  réellement nouveaux, et écrit l'état complet dans Vercel Blob. Le périmètre a couvert les 101
-  départements français un temps, mais a été ramené à l'IDF + voisins le 2026-08-03 après que le
-  compte s'est fait bloquer par le contrôle anti-abus du site lui-même (« Nombre maximum de
-  requêtes atteint ») — voir `docs/sessions/` pour le détail de l'incident.
+  réellement nouveaux, et écrit l'état complet dans Vercel Blob.
 - `web/` est un dashboard Next.js déployé sur Vercel qui lit cet état et l'affiche, sans
   authentification.
+
+> **Avertissement — rate limit côté site.** L'API interne des créneaux est utilisable une fois
+> authentifié, mais le site applique son propre contrôle anti-abus par compte (« Nombre maximum de
+> requêtes atteint »). Le worker a couvert les 101 départements français un temps, mais s'est fait
+> bloquer le 2026-08-03 en les interrogeant tous toutes les 15 minutes en heures de pointe — voir
+> `docs/sessions/` pour le détail de l'incident. Il n'existe à ce jour aucun contournement connu de
+> cette limite (et ce n'est pas l'objectif de ce projet : voir « Sécurité » ci-dessus). En son
+> absence, le périmètre est donc volontairement réduit à l'Île-de-France et aux départements
+> limitrophes plutôt qu'aux 101 départements.
 
 ### Le conteneur de login
 
 Le formulaire de connexion du site est protégé par Cloudflare Turnstile, qui bloque toute
 automatisation pilotée via le Chrome DevTools Protocol (CDP) — donc tout ce qui repose sur
 Playwright ou Puppeteer classiques, quels que soient les efforts de camouflage du navigateur.
-`worker/src/login.ts` (Playwright) existe encore dans le repo mais n'est plus utilisé — c'est du
-code mort, conservé par prudence.
 
 La solution retenue, dans `worker/login-container/` : un conteneur Docker qui lance un vrai serveur
 X (Xorg, avec accès direct au GPU du Raspberry Pi via `/dev/dri`) et un Chromium **sans aucun flag
