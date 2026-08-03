@@ -10,7 +10,7 @@ Deux façons de suivre les alertes :
 
 - **Le dashboard public**, sans authentification : <https://web-delta-seven-90.vercel.app>
 - **Le groupe Telegram**, qui reçoit les mêmes alertes en temps réel dès qu'un créneau réellement
-  nouveau apparaît : `[LIEN DU GROUPE TELEGRAM À AJOUTER]`
+  nouveau apparaît : <https://t.me/+AnbsHQuoFiRlODQ0>
 
 ## Sécurité
 
@@ -76,7 +76,7 @@ Cette approche fonctionne, mais deux points sont à garder en tête si vous la r
 
 ## Dashboard
 
-`[SCREENSHOT DU DASHBOARD À AJOUTER ICI, ex: docs/screenshot-dashboard.png]`
+![Dashboard RdvPermis](docs/screenshot-dashboard.png)
 
 Le dashboard (<https://web-delta-seven-90.vercel.app>) affiche, pour les départements sélectionnés,
 les créneaux disponibles groupés par département, avec :
