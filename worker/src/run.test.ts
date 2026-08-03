@@ -143,7 +143,7 @@ describe('run', () => {
     mocks.readState.mockResolvedValue(null);
     mocks.fetchDepartementCreneaux.mockImplementation(async (dep: string) => {
       if (dep === DEPARTEMENTS[0]) {
-        throw new RateLimitedError(dep);
+        throw new RateLimitedError(dep, '120', '');
       }
       return [];
     });

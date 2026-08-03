@@ -18,9 +18,15 @@ import {
 
 // execFile is promisified via node:util's callback-style wrapping, so the
 // mock has to behave like the callback form: (file, args, opts, callback).
-function mockCurlResult(status: number, body: string) {
+// Mirrors curl -i's output shape: status line + headers, a blank line, the
+// body, then curl's own -w-appended status code on its own line.
+function mockCurlResult(status: number, body: string, headers: Record<string, string> = {}) {
+  const headerBlock = [
+    `HTTP/2 ${status}`,
+    ...Object.entries(headers).map(([key, value]) => `${key}: ${value}`),
+  ].join('\r\n');
   mocks.execFile.mockImplementationOnce((_file, _args, _opts, callback) => {
-    callback(null, { stdout: `${body}\n${status}`, stderr: '' });
+    callback(null, { stdout: `${headerBlock}\r\n\r\n${body}\n${status}`, stderr: '' });
   });
 }
 
@@ -130,6 +136,20 @@ describe('fetchDepartementCreneaux', () => {
       RateLimitedError
     );
     expect(mocks.execFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes the Retry-After header and a body snippet in the RateLimitedError message', async () => {
+    mockCurlResult(429, '{"message":"Nombre maximum de requetes atteint"}', { 'retry-after': '120' });
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toThrow(
+      /Retry-After: 120.*Nombre maximum de requetes atteint/s
+    );
+  });
+
+  it('notes the absence of a Retry-After header when the 429 response omits one', async () => {
+    mockCurlResult(429, '');
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toThrow(
+      /no Retry-After header/
+    );
   });
 
   it('throws SessionExpiredError after a transient failure then 401, without a third attempt', async () => {
