@@ -4,20 +4,13 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { SELECTABLE_DEPARTEMENTS, IDF_ET_VOISINS, foldForSearch } from '@/lib/departements';
+import { SELECTABLE_DEPARTEMENTS, foldForSearch } from '@/lib/departements';
 import { buildFilterHref } from '@/lib/creneaux';
 
 const SEARCH_INDEX = SELECTABLE_DEPARTEMENTS.map((d) => ({
   ...d,
   haystack: `${foldForSearch(d.name)} ${d.code.toLowerCase()}`,
 }));
-
-const IDF_PRESET_LABEL = `Île-de-France + départements voisins (${IDF_ET_VOISINS.length})`;
-const IDF_PRESET_KEYWORDS = ['idf', 'ile de france', 'voisin', 'voisins'];
-
-function matchesIdfPreset(trimmedQuery: string): boolean {
-  return trimmedQuery === '' || IDF_PRESET_KEYWORDS.some((k) => k.includes(trimmedQuery));
-}
 
 export function DepartementPicker({ selected }: { selected: string[] }) {
   const router = useRouter();
@@ -36,7 +29,6 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
   const options = SEARCH_INDEX.filter(
     (d) => trimmedQuery === '' || d.haystack.includes(trimmedQuery)
   );
-  const showIdfPreset = matchesIdfPreset(trimmedQuery);
 
   function toggle(code: string) {
     // Always a plain toggle against the current selection (add if absent,
@@ -46,12 +38,6 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
     // state. The dropdown stays open so several departements can be
     // checked in one pass.
     router.push(buildFilterHref(selected, code));
-  }
-
-  function applyPreset(codes: string[]) {
-    router.push(`?dep=${codes.join(',')}`);
-    setQuery('');
-    setIsOpen(false);
   }
 
   return (
@@ -87,23 +73,22 @@ export function DepartementPicker({ selected }: { selected: string[] }) {
           aria-hidden="true"
           className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         />
-        {isOpen && (showIdfPreset || options.length > 0) && (
+        {isOpen && options.length > 0 && (
           <div
             id={listboxId}
             role="listbox"
             aria-multiselectable="true"
+            // Without this, tapping an option on touch devices blurs the
+            // input first (mobile browsers fire the synthetic mousedown
+            // that precedes a tap's click without a matching relatedTarget,
+            // so the onBlur check below can't tell the tap landed inside
+            // this listbox) -- isOpen flips to false and unmounts this menu
+            // before the tap's click event ever reaches the button.
+            // preventDefault on mousedown stops that focus shift without
+            // blocking the click that follows.
+            onMouseDown={(e) => e.preventDefault()}
             className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-md"
           >
-            {showIdfPreset && (
-              <button
-                type="button"
-                role="option"
-                onClick={() => applyPreset(IDF_ET_VOISINS)}
-                className="block w-full px-3 py-2 text-left text-sm font-medium text-primary hover:bg-accent hover:text-accent-foreground"
-              >
-                {IDF_PRESET_LABEL}
-              </button>
-            )}
             {options.map((d) => {
               const isChecked = selectedSet.has(d.code);
               return (
