@@ -30,28 +30,28 @@ describe('shouldRunCheck', () => {
     expect(shouldRunCheck(null, new Date('2026-01-15T10:00:00Z'))).toBe(true);
   });
 
-  it('returns false in a peak window when less than 15 min have elapsed', () => {
-    // now = 08:30 Paris (peak), lastChecked = 08:20 Paris -> 10 min elapsed
-    const lastChecked = '2026-01-15T07:20:00Z';
+  it('returns false in a peak window when less than 5 min have elapsed', () => {
+    // now = 08:30 Paris (peak), lastChecked = 08:27 Paris -> 3 min elapsed
+    const lastChecked = '2026-01-15T07:27:00Z';
     const now = new Date('2026-01-15T07:30:00Z');
     expect(shouldRunCheck(lastChecked, now)).toBe(false);
   });
 
-  it('returns true in a peak window when at least 15 min have elapsed', () => {
-    // now = 08:30 Paris (peak), lastChecked = 08:10 Paris -> 20 min elapsed
-    const lastChecked = '2026-01-15T07:10:00Z';
+  it('returns true in a peak window when at least 5 min have elapsed', () => {
+    // now = 08:30 Paris (peak), lastChecked = 08:25 Paris -> 5 min elapsed
+    const lastChecked = '2026-01-15T07:25:00Z';
     const now = new Date('2026-01-15T07:30:00Z');
     expect(shouldRunCheck(lastChecked, now)).toBe(true);
   });
 
-  it('returns false off-peak when less than 60 min have elapsed', () => {
-    // now = 10:30 Paris (off-peak), lastChecked = 10:10 Paris -> 20 min elapsed
-    const lastChecked = '2026-01-15T09:10:00Z';
+  it('returns false off-peak when less than 15 min have elapsed', () => {
+    // now = 10:30 Paris (off-peak), lastChecked = 10:20 Paris -> 10 min elapsed
+    const lastChecked = '2026-01-15T09:20:00Z';
     const now = new Date('2026-01-15T09:30:00Z');
     expect(shouldRunCheck(lastChecked, now)).toBe(false);
   });
 
-  it('returns true off-peak when at least 60 min have elapsed, even at irregular minute marks', () => {
+  it('returns true off-peak when at least 15 min have elapsed, even at irregular minute marks', () => {
     // The exact scenario that motivated this design: last real check at
     // 14:43 Paris, current run lands at 15:47 Paris (neither is a clean
     // :00/:30 mark, but 64 min have genuinely elapsed and both are off-peak

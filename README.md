@@ -1,10 +1,13 @@
 # RdvPermis
 
 Vérification automatique des créneaux d'examen du permis de conduire en candidat libre
-(candidat.permisdeconduire.gouv.fr) sur les **8 départements d'Île-de-France et leurs 8
-départements limitrophes** (16 au total). Le service détecte et affiche les disponibilités, y
-compris les nouvelles depuis la dernière vérification, mais ne réserve rien automatiquement : c'est
-à l'utilisateur d'aller réserver lui-même une fois un créneau repéré.
+(candidat.permisdeconduire.gouv.fr) sur **4 départements : Seine-et-Marne (77), Yvelines (78), Eure
+(27) et Eure-et-Loir (28)**. Le service détecte et affiche les disponibilités, y compris les
+nouvelles depuis la dernière vérification, mais ne réserve rien automatiquement : c'est à
+l'utilisateur d'aller réserver lui-même une fois un créneau repéré. Le périmètre est
+volontairement restreint à ces 4 départements pour permettre une vérification bien plus fréquente
+sans déclencher le contrôle anti-abus du site (voir « Fonctionnement » plus bas) : les alertes ne
+portent donc que sur ces départements, sans « faux espoir » sur un autre.
 
 Deux façons de suivre les alertes :
 
@@ -21,14 +24,12 @@ les créneaux disponibles groupés par département, avec :
 
 - un badge « Nouveau » sur les créneaux détectés depuis la dernière vérification ;
 - un sélecteur de département en liste déroulante (recherche par nom ou code, pliage des accents —
-  taper « rhone » trouve « Rhône ») ;
-- un raccourci « Île-de-France + départements voisins » épinglé en tête de cette liste, qui
-  remplace la sélection courante par l'IDF et les 8 départements limitrophes en un clic ;
+  taper « rhone » trouve « Rhône »), limité aux 4 départements que le worker vérifie réellement ;
 - un bouton « Réserver mon examen », qui renvoie directement vers l'espace candidat officiel
   (<https://candidat.permisdeconduire.gouv.fr/reservation>) — ce dashboard ne réserve rien
   lui-même, il ne fait que signaler la disponibilité.
 
-La sélection de départements est portée par l'URL (`?dep=075,077,...`), donc partageable telle
+La sélection de départements est portée par l'URL (`?dep=077,078,...`), donc partageable telle
 quelle : envoyer un lien avec sa propre sélection à quelqu'un d'autre lui affiche la même vue.
 
 ## Sécurité
@@ -51,18 +52,20 @@ quelle : envoyer un lien avec sa propre sélection à quelqu'un d'autre lui affi
 
 ## Fonctionnement
 
-- `worker/` s'exécute uniquement dans un workflow GitHub Actions planifié (toutes les 15 min en
-  heures de pointe, une fois par heure le reste du temps). Il obtient un cookie de session valide
+- `worker/` s'exécute uniquement dans un workflow GitHub Actions planifié (toutes les 5 min en
+  heures de pointe, toutes les 15 min le reste du temps). Il obtient un cookie de session valide
   via un conteneur de login dédié (voir ci-dessous), interroge l'API interne des créneaux pour
-  chacun des 16 départements d'Île-de-France + limitrophes, notifie sur Telegram les créneaux
-  réellement nouveaux, et écrit l'état complet dans Vercel Blob.
+  chacun des 4 départements suivis (77, 78, 27, 28), notifie sur Telegram les créneaux réellement
+  nouveaux, et écrit l'état complet dans Vercel Blob.
 - `web/` est un dashboard Next.js déployé sur Vercel qui lit cet état et l'affiche, sans
   authentification.
 
 > **Avertissement — rate limit côté site.** L'API interne des créneaux est utilisable une fois
 > authentifié, mais le site applique son propre contrôle anti-abus par compte. Impossible donc
-> d'interroger les 101 départements français ; le périmètre est réduit à l'Île-de-France et aux
-> départements limitrophes.
+> d'interroger les 101 départements français à haute fréquence ; le périmètre est réduit à 4
+> départements pour permettre des vérifications rapprochées (toutes les 5 min en heures de pointe)
+> sans dépasser le débit de requêtes par compte déjà validé avec un périmètre plus large et une
+> fréquence plus faible — voir le commentaire dans `worker/src/config.ts` pour le calcul.
 
 ### Le conteneur de login
 
@@ -161,7 +164,7 @@ sur le repo.
 
 1. Installer le système sur le Pi et le connecter à la box internet du domicile (Ethernet
    recommandé pour la stabilité). S'assurer que le Pi reste allumé et connecté en permanence : le
-   workflow tourne 24h/24 (toutes les 15 min en heures de pointe, une fois par heure le reste du
+   workflow tourne 24h/24 (toutes les 5 min en heures de pointe, toutes les 15 min le reste du
    temps -- voir `.github/workflows/check-slots.yml`).
 2. Sur le repo GitHub (celui créé à l'étape 1), ouvrir **Settings → Actions → Runners → New
    self-hosted runner**, choisir `Linux` / `ARM64`, et relever la commande d'enregistrement affichée
@@ -332,20 +335,25 @@ conteneur de login » plus haut). Un message Telegram n'arrive que si un crénea
 est trouvé : l'absence de message ne signifie pas que l'exécution a échoué.
 
 Le workflow s'exécute ensuite automatiquement via les crons définis dans
-`.github/workflows/check-slots.yml` : toutes les 15 min pendant les heures de pointe (8h-9h,
-11h-14h, 16h-18h heure de Paris), une fois par heure le reste du temps -- pour limiter le volume de
-requêtes global. Ces horaires sont codés en dur en UTC (le cron GitHub Actions ne connaît pas les
-fuseaux horaires) et doivent être décalés d'une heure à chaque changement d'heure -- voir le
-commentaire dans le fichier de workflow. À noter : GitHub désactive automatiquement les workflows
-planifiés (`schedule`) après 60 jours sans activité sur le repo. Un `git push`, même minime, suffit
-à réactiver le cron le cas échéant.
+`.github/workflows/check-slots.yml` : toutes les 5 min pendant les heures de pointe (8h-9h,
+11h-14h, 16h-18h heure de Paris), toutes les 15 min le reste du temps -- un rythme resserré rendu
+possible par le périmètre réduit à 4 départements (voir « Fonctionnement » plus haut). Ces horaires
+sont codés en dur en UTC (le cron GitHub Actions ne connaît pas les fuseaux horaires) et doivent
+être décalés d'une heure à chaque changement d'heure -- voir le commentaire dans le fichier de
+workflow. À noter : GitHub désactive automatiquement les workflows planifiés (`schedule`) après 60
+jours sans activité sur le repo. Un `git push`, même minime, suffit à réactiver le cron le cas
+échéant.
 
 ## Configuration
 
 - **Ajouter ou retirer un département** : modifier le tableau `DEPARTEMENTS` dans
   `worker/src/config.ts` (codes sur 3 chiffres, zero-paddés, par exemple `"078"`). Le dashboard
   (`web/lib/departements.ts`) a sa propre copie de la liste complète (codes + noms) : la tenir à
-  jour séparément si le périmètre du worker change.
+  jour séparément si le périmètre du worker change. **Attention au rate limit** : ajouter des
+  départements dilue le budget de requêtes par compte sur davantage de cibles — voir le commentaire
+  dans `worker/src/config.ts` pour le calcul entre nombre de départements et intervalle de
+  vérification, et resserrer `PEAK_CHECK_INTERVAL_MINUTES`/`OFF_PEAK_CHECK_INTERVAL_MINUTES` en
+  conséquence si le périmètre grandit à nouveau.
 - **Changer les fenêtres de pointe ou la fréquence** : modifier `PEAK_WINDOWS`,
   `PEAK_CHECK_INTERVAL_MINUTES`, `OFF_PEAK_CHECK_INTERVAL_MINUTES` dans `worker/src/config.ts`. Ces
   heures sont interprétées en heure de Paris (CET/CEST géré automatiquement). **Penser aussi** à

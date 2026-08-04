@@ -7,17 +7,14 @@ import {
 } from './config';
 
 describe('config', () => {
-  it('lists the 16 Ile-de-France + neighboring departements as zero-padded, 3-character codes with no duplicates', () => {
-    expect(DEPARTEMENTS).toHaveLength(16);
-    expect(new Set(DEPARTEMENTS).size).toBe(16);
+  it('lists the 4 filtered departements as zero-padded, 3-character codes with no duplicates', () => {
+    expect(DEPARTEMENTS).toHaveLength(4);
+    expect(new Set(DEPARTEMENTS).size).toBe(4);
     expect(DEPARTEMENTS.every((d) => d.length === 3)).toBe(true);
   });
 
-  it('includes all 8 Ile-de-France departements and their 8 bordering departements', () => {
-    for (const dep of [
-      '075', '077', '078', '091', '092', '093', '094', '095',
-      '002', '010', '027', '028', '045', '051', '060', '089',
-    ]) {
+  it('includes Eure, Eure-et-Loir, Seine-et-Marne, and Yvelines', () => {
+    for (const dep of ['027', '028', '077', '078']) {
       expect(DEPARTEMENTS).toContain(dep);
     }
   });
@@ -30,8 +27,8 @@ describe('config', () => {
     ]);
   });
 
-  it('sets a 15 min peak interval and 60 min off-peak interval', () => {
-    expect(PEAK_CHECK_INTERVAL_MINUTES).toBe(15);
-    expect(OFF_PEAK_CHECK_INTERVAL_MINUTES).toBe(60);
+  it('sets a 5 min peak interval and 15 min off-peak interval', () => {
+    expect(PEAK_CHECK_INTERVAL_MINUTES).toBe(5);
+    expect(OFF_PEAK_CHECK_INTERVAL_MINUTES).toBe(15);
   });
 });

@@ -113,13 +113,13 @@ export const DEPARTEMENTS: DepartementInfo[] = [
   { code: '976', name: 'Mayotte' },
 ];
 
-// Île-de-France (8 departments) + the 8 departments that directly border the region —
-// used by DepartementPicker's "IDF + voisins" preset. Bordering, not full neighboring
-// administrative regions (e.g. excludes the Manche, all the way out in Normandie).
-export const IDF_ET_VOISINS: string[] = [
-  '075', '077', '078', '091', '092', '093', '094', '095',
-  '002', '010', '027', '028', '045', '051', '060', '089',
-];
+// Seine-et-Marne, Yvelines (Île-de-France) + Eure, Eure-et-Loir (bordering
+// departements) -- the filtered scope worker/src/config.ts actually checks.
+// Narrowed down from the previous 16 (8 IDF + all 8 bordering departements,
+// see git history) to allow much more frequent checks within the same
+// per-account request budget. Keep this in sync with worker/src/config.ts's
+// DEPARTEMENTS if that scope ever changes.
+export const IDF_ET_VOISINS: string[] = ['027', '028', '077', '078'];
 
 // The only departements worker/src/config.ts actually checks -- DEPARTEMENTS
 // above stays the full 101-entry reference list (still needed to name any
