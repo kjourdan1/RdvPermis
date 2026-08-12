@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
@@ -14,6 +17,8 @@ import {
   randomDelayMs,
   SessionExpiredError,
   RateLimitedError,
+  interpretApiResult,
+  loadPreFetchedCreneaux,
 } from './checkSlots';
 
 // execFile is promisified via node:util's callback-style wrapping, so the
@@ -175,6 +180,100 @@ describe('fetchDepartementCreneaux', () => {
       'Could not resolve host'
     );
     expect(mocks.execFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('interpretApiResult', () => {
+  it('throws SessionExpiredError with status and body on a 401', () => {
+    expect(() => interpretApiResult('078', { status: 401, body: 'nope' })).toThrow(
+      /HTTP 401.*nope/s
+    );
+  });
+
+  it('throws RateLimitedError with Retry-After on a 429', () => {
+    expect(() =>
+      interpretApiResult('078', {
+        status: 429,
+        body: 'slow down',
+        responseHeaders: { 'retry-after': '60' },
+      })
+    ).toThrow(/Retry-After: 60.*slow down/s);
+  });
+
+  it('throws a generic error on an unexpected non-2xx status', () => {
+    expect(() => interpretApiResult('078', { status: 500, body: '' })).toThrow(
+      'Creneaux API returned 500 for departement 078'
+    );
+  });
+
+  it('throws on status 0 (network error / exception before a response)', () => {
+    expect(() => interpretApiResult('078', { status: 0, body: 'TypeError: fetch failed' })).toThrow(
+      /No response for departement 078/
+    );
+  });
+
+  it('parses a successful 2xx response the same way parseApiResponse does', () => {
+    const body = JSON.stringify([{ centre: { nom: 'Test' }, creneaux: [{ dateDebut: '2026-09-01T10:00:00Z' }] }]);
+    const result = interpretApiResult('078', { status: 200, body });
+    expect(result).toEqual([{ departement: '078', centre: 'Test', date: '2026-09-01', heure: '12:00' }]);
+  });
+});
+
+describe('loadPreFetchedCreneaux', () => {
+  it('returns an empty map when the file does not exist', () => {
+    const map = loadPreFetchedCreneaux('/nonexistent/path/creneaux.json');
+    expect(map.size).toBe(0);
+  });
+
+  it('returns an empty map when the file contains malformed JSON', () => {
+    const path = join(tmpdir(), `creneaux-malformed-${Date.now()}.json`);
+    writeFileSync(path, 'not valid json {{{');
+    try {
+      const map = loadPreFetchedCreneaux(path);
+      expect(map.size).toBe(0);
+    } finally {
+      unlinkSync(path);
+    }
+  });
+
+  it('loads well-formed data keyed by departement', () => {
+    const path = join(tmpdir(), `creneaux-valid-${Date.now()}.json`);
+    writeFileSync(
+      path,
+      JSON.stringify([
+        { departement: '027', status: 200, body: '[]' },
+        { departement: '028', status: 401, body: 'unauthorized' },
+      ])
+    );
+    try {
+      const map = loadPreFetchedCreneaux(path);
+      expect(map.size).toBe(2);
+      expect(map.get('027')).toEqual({ status: 200, body: '[]' });
+      expect(map.get('028')).toEqual({ status: 401, body: 'unauthorized' });
+    } finally {
+      unlinkSync(path);
+    }
+  });
+});
+
+describe('fetchDepartementCreneaux with pre-fetched data', () => {
+  beforeEach(() => {
+    mocks.execFile.mockReset();
+  });
+
+  it('uses the pre-fetched result and does not call curl when present', async () => {
+    const preFetched = new Map([['078', { status: 200, body: '[]' }]]);
+    const result = await fetchDepartementCreneaux('078', 'session=abc', preFetched);
+    expect(result).toEqual([]);
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it('falls back to curl when the departement is missing from the pre-fetched map', async () => {
+    mockCurlResult(200, '[]');
+    const preFetched = new Map([['999', { status: 200, body: '[]' }]]);
+    const result = await fetchDepartementCreneaux('078', 'session=abc', preFetched);
+    expect(result).toEqual([]);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
 });
 

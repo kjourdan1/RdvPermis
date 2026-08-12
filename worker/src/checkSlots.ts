@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import type { Creneau } from './types';
 
@@ -133,25 +134,86 @@ async function curlGet(
   return { body, status, responseHeaders };
 }
 
+export interface RawApiResult {
+  status: number;
+  body: string;
+  responseHeaders?: Record<string, string>;
+}
+
+// Shared by both the curl-backed live-fetch path and the new browser-fetch
+// pre-fetched-file path, so the 401/403/429/2xx interpretation rules never
+// drift between the two - see docs/superpowers/specs/2026-08-12-browser-fetch-creneaux-design.md.
+export function interpretApiResult(departement: string, result: RawApiResult): Creneau[] {
+  const { status, body, responseHeaders = {} } = result;
+  if (status === 401 || status === 403) {
+    throw new SessionExpiredError(departement, status, body.slice(0, 300));
+  }
+  if (status === 429) {
+    throw new RateLimitedError(departement, responseHeaders['retry-after'], body.slice(0, 300));
+  }
+  if (status === 0) {
+    throw new Error(`No response for departement ${departement} (network error): ${body.slice(0, 300)}`);
+  }
+  if (status < 200 || status >= 300) {
+    throw new Error(`Creneaux API returned ${status} for departement ${departement}`);
+  }
+  return parseApiResponse(departement, JSON.parse(body));
+}
+
+// Reads the browser-fetch step's output (worker/login-container/run.sh writes
+// this before handing off to this worker step) - missing file or malformed
+// JSON is not an error here, just an empty map, so every departement falls
+// through to the existing curl path automatically.
+export function loadPreFetchedCreneaux(path: string): Map<string, { status: number; body: string }> {
+  const map = new Map<string, { status: number; body: string }>();
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return map;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return map;
+  }
+  if (!Array.isArray(parsed)) {
+    return map;
+  }
+  for (const entry of parsed) {
+    if (
+      entry &&
+      typeof entry === 'object' &&
+      typeof (entry as Record<string, unknown>).departement === 'string' &&
+      typeof (entry as Record<string, unknown>).status === 'number' &&
+      typeof (entry as Record<string, unknown>).body === 'string'
+    ) {
+      const e = entry as { departement: string; status: number; body: string };
+      map.set(e.departement, { status: e.status, body: e.body });
+    }
+  }
+  return map;
+}
+
 export async function fetchDepartementCreneaux(
   departement: string,
-  cookieHeader: string
+  cookieHeader: string,
+  preFetched: Map<string, { status: number; body: string }> = new Map()
 ): Promise<Creneau[]> {
+  const fromBrowser = preFetched.get(departement);
+  if (fromBrowser) {
+    console.log(`[checkSlots] departement ${departement}: source=browser-fetch`);
+    return interpretApiResult(departement, fromBrowser);
+  }
+  console.log(`[checkSlots] departement ${departement}: source=curl-fallback`);
+
   const attempt = async (): Promise<Creneau[]> => {
     const { status, body, responseHeaders } = await curlGet(
       `${API_BASE}?code-departement=${departement}`,
       { ...API_HEADERS, Cookie: cookieHeader }
     );
-    if (status === 401 || status === 403) {
-      throw new SessionExpiredError(departement, status, body.slice(0, 300));
-    }
-    if (status === 429) {
-      throw new RateLimitedError(departement, responseHeaders['retry-after'], body.slice(0, 300));
-    }
-    if (status < 200 || status >= 300) {
-      throw new Error(`Creneaux API returned ${status} for departement ${departement}`);
-    }
-    return parseApiResponse(departement, JSON.parse(body));
+    return interpretApiResult(departement, { status, body, responseHeaders });
   };
 
   try {
