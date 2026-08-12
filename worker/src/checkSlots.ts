@@ -4,9 +4,17 @@ import type { Creneau } from './types';
 
 const execFileAsync = promisify(execFile);
 
+// Covers both 401 and 403 - status and bodySnippet are optional so existing
+// callers that just need a SessionExpiredError instance (e.g. tests) don't
+// need to supply them, but the real throw site in fetchDepartementCreneaux
+// passes both: a bare "session expired" message can't distinguish a stale
+// cookie (401) from an active block (403), which was invisible in the CI
+// log until this was added.
 export class SessionExpiredError extends Error {
-  constructor(departement: string) {
-    super(`Session expired while fetching departement ${departement}`);
+  constructor(departement: string, status?: number, bodySnippet?: string) {
+    const statusInfo = status !== undefined ? ` (HTTP ${status})` : '';
+    const bodyInfo = bodySnippet ? ` -- body: ${bodySnippet}` : '';
+    super(`Session expired${statusInfo} while fetching departement ${departement}${bodyInfo}`);
     this.name = 'SessionExpiredError';
   }
 }
@@ -135,7 +143,7 @@ export async function fetchDepartementCreneaux(
       { ...API_HEADERS, Cookie: cookieHeader }
     );
     if (status === 401 || status === 403) {
-      throw new SessionExpiredError(departement);
+      throw new SessionExpiredError(departement, status, body.slice(0, 300));
     }
     if (status === 429) {
       throw new RateLimitedError(departement, responseHeaders['retry-after'], body.slice(0, 300));

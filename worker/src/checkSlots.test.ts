@@ -122,6 +122,13 @@ describe('fetchDepartementCreneaux', () => {
     expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
 
+  it('includes the status code and a body snippet in the SessionExpiredError message', async () => {
+    mockCurlResult(403, '{"message":"Forbidden by WAF rule"}');
+    await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toThrow(
+      /HTTP 403.*Forbidden by WAF rule/s
+    );
+  });
+
   it('throws SessionExpiredError immediately on a 403, without retrying', async () => {
     mockCurlResult(403, '');
     await expect(fetchDepartementCreneaux('078', 'session=abc')).rejects.toBeInstanceOf(
