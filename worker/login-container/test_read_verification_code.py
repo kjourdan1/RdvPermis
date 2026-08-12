@@ -94,3 +94,30 @@ def test_wait_for_code_times_out_when_nothing_new_arrives():
         assert False, "expected TimeoutError"
     except TimeoutError:
         pass
+
+
+def test_get_watermark_returns_current_max_uid():
+    from read_verification_code import get_watermark
+    conn = FakeIMAPConnection({1: _make_email("code: 111111"), 2: _make_email("code: 222222")})
+    watermark = get_watermark("imap.example.com", "user", "pw", imap_factory=lambda h, p: conn)
+    assert watermark == 2
+
+
+def test_wait_for_code_uses_explicit_since_uid_not_a_freshly_computed_one():
+    # Simulates the confirmed real race: the code email (UID 5) already
+    # exists in the mailbox by the time wait_for_code is called, but the
+    # watermark was recorded earlier (since_uid=4, before that email
+    # arrived) - so it must still be found, not treated as stale.
+    conn = FakeIMAPConnection({
+        1: _make_email("old: 000000"),
+        2: _make_email("old: 000000"),
+        3: _make_email("old: 000000"),
+        4: _make_email("old: 000000"),
+        5: _make_email("code: 654321"),
+    })
+    code = wait_for_code(
+        "imap.example.com", "user", "pw",
+        since_uid=4, max_wait_s=2, poll_interval_s=1,
+        sleep_fn=lambda s: None, imap_factory=lambda h, p: conn,
+    )
+    assert code == "654321"

@@ -71,29 +71,53 @@ def get_current_max_uid(conn) -> int:
     return int(uids[-1]) if uids else 0
 
 
+def get_watermark(host: str, user: str, password: str, *, imap_factory=imaplib.IMAP4_SSL) -> int:
+    """Connects and records the mailbox's current highest UID, without
+    waiting for anything. Meant to be called as early as possible in the
+    login flow - see wait_for_code's since_uid parameter for why."""
+    conn = imap_factory(host, 993)
+    try:
+        conn.login(user, password)
+        conn.select("INBOX")
+        return get_current_max_uid(conn)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+
 def wait_for_code(
     host: str,
     user: str,
     password: str,
     *,
+    since_uid: int | None = None,
     max_wait_s: float = 240.0,
     poll_interval_s: float = 5.0,
     sleep_fn=None,
     imap_factory=imaplib.IMAP4_SSL,
 ) -> str:
-    """Records the mailbox's current highest UID before polling, so a
-    stale code email from a previous run (this inbox accumulates one per
-    cron run, indefinitely) never gets picked up - only messages that
-    arrive after this call starts are ever considered."""
+    """Polls for a message with UID greater than since_uid. If since_uid
+    is None, records the mailbox's current highest UID at call time
+    (original behavior) - but that's late: a real run showed the
+    verification email can arrive within ~10s of form submission, well
+    before this function itself gets invoked several script-seconds
+    later, causing a false "never arrived" timeout even though the email
+    was already there. Pass an explicit since_uid (from a call to
+    get_watermark made as early as possible, before the login flow
+    starts) to avoid this - this now means only messages that arrive
+    after login started are ever considered, not just after this
+    function was called."""
     sleep_fn = sleep_fn or time.sleep
     conn = imap_factory(host, 993)
     try:
         conn.login(user, password)
         conn.select("INBOX")
-        since_uid = get_current_max_uid(conn)
+        watermark = since_uid if since_uid is not None else get_current_max_uid(conn)
         elapsed = 0.0
         while elapsed <= max_wait_s:
-            code = find_new_code(conn, since_uid)
+            code = find_new_code(conn, watermark)
             if code is not None:
                 return code
             sleep_fn(poll_interval_s)
@@ -115,8 +139,23 @@ def main(argv: list[str]) -> int:
     if not password:
         print("[read_verification_code] IONOS_IMAP_PASSWORD not set", file=sys.stderr)
         return 1
+
+    if argv and argv[0] == "--get-watermark":
+        try:
+            uid = get_watermark(host, user, password)
+        except imaplib.IMAP4.error as e:
+            print(f"[read_verification_code] {e}", file=sys.stderr)
+            return 1
+        print(uid)
+        return 0
+
+    since_uid = None
+    for arg in argv:
+        if arg.startswith("--since-uid="):
+            since_uid = int(arg.split("=", 1)[1])
+
     try:
-        code = wait_for_code(host, user, password)
+        code = wait_for_code(host, user, password, since_uid=since_uid)
     except (TimeoutError, imaplib.IMAP4.error, ValueError) as e:
         print(f"[read_verification_code] {e}", file=sys.stderr)
         return 1

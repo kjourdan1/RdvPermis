@@ -4,6 +4,16 @@ export DISPLAY=:0
 mkdir -p /output
 chmod 777 /output || true
 
+# Recorded as early as possible, before the login flow even starts - a
+# real run showed the verification-code email can arrive within ~10s of
+# form submission, well before the later wait-for-code step actually
+# runs (which happens several script-minutes into the run). Recording
+# the watermark here instead guarantees it predates any email this run
+# could possibly trigger, no matter how fast the site-to-mailbox chain
+# is.
+echo '[run] recording verification-code mailbox watermark'
+CODE_WATERMARK=$(python3 /opt/read_verification_code.py --get-watermark)
+
 # The '--no-sandbox' infobar shifts every on-page Y coordinate down by this
 # many pixels. There's no supported flag to suppress that infobar (Google
 # removed --disable-infobars specifically to stop this) short of dropping
@@ -160,7 +170,7 @@ snap 4-final.png
 # for an email that never gets triggered, and the title check below
 # still correctly reports the real failure.
 echo '[run] waiting for verification code email'
-CODE=$(python3 /opt/read_verification_code.py)
+CODE=$(python3 /opt/read_verification_code.py "--since-uid=$CODE_WATERMARK")
 echo '[run] entering verification code'
 move_mouse_human 632 600
 xdotool click 1
