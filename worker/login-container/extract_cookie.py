@@ -5,11 +5,41 @@ DevTools via blind pixel-coordinate clicks. See
 docs/superpowers/specs/2026-08-12-cookie-extraction-sqlite.md for why.
 """
 import hashlib
+import sqlite3
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA1
 from Crypto.Util.Padding import unpad
+
+
+TARGET_HOST_KEYS = ("candidat.permisdeconduire.gouv.fr", ".permisdeconduire.gouv.fr")
+
+
+def query_cookie_rows(db_path: str) -> list[dict]:
+    """Reads rows scoped to the candidat API host and its parent domain
+    from an already-copied (not live-locked) Cookies sqlite file."""
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        placeholders = ",".join("?" for _ in TARGET_HOST_KEYS)
+        cursor = conn.execute(
+            f"""SELECT name, host_key, path, creation_utc, encrypted_value
+                FROM cookies
+                WHERE host_key IN ({placeholders}) AND path = '/'""",
+            TARGET_HOST_KEYS,
+        )
+        return [
+            {
+                "name": name,
+                "host_key": host_key,
+                "path": path,
+                "creation_utc": creation_utc,
+                "encrypted_value": encrypted_value,
+            }
+            for name, host_key, path, creation_utc, encrypted_value in cursor.fetchall()
+        ]
+    finally:
+        conn.close()
 
 
 def decrypt_cookie_value(encrypted_value: bytes, host_key: str) -> str:

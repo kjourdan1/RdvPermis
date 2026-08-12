@@ -1,10 +1,13 @@
 import hashlib
+import sqlite3
+import tempfile
+import os
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA1
 
-from extract_cookie import decrypt_cookie_value
+from extract_cookie import decrypt_cookie_value, query_cookie_rows
 
 
 def _encrypt_for_test(plaintext: bytes, host_key: str) -> bytes:
@@ -40,3 +43,38 @@ def test_decrypt_cookie_value_empty_value():
     host_key = ".permisdeconduire.gouv.fr"
     encrypted = _encrypt_for_test(b"", host_key)
     assert decrypt_cookie_value(encrypted, host_key) == ""
+
+
+def _make_test_db(path, rows):
+    conn = sqlite3.connect(path)
+    conn.execute(
+        """CREATE TABLE cookies(
+            creation_utc INTEGER NOT NULL, host_key TEXT NOT NULL,
+            name TEXT NOT NULL, encrypted_value BLOB NOT NULL,
+            path TEXT NOT NULL
+        )"""
+    )
+    for row in rows:
+        conn.execute(
+            "INSERT INTO cookies (creation_utc, host_key, name, encrypted_value, path) VALUES (?, ?, ?, ?, ?)",
+            row,
+        )
+    conn.commit()
+    conn.close()
+
+
+def test_query_cookie_rows_filters_by_host_and_path():
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "Cookies")
+        _make_test_db(
+            db_path,
+            [
+                (100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/"),
+                (200, ".permisdeconduire.gouv.fr", "cf_clearance", b"v10BBBB", "/"),
+                (300, "moncompte.permisdeconduire.gouv.fr", "AUTH_SESSION_ID", b"v10CCCC", "/auth/realms/usager/"),
+                (400, ".moncompte.permisdeconduire.gouv.fr", "TC_PRIVACY", b"v10DDDD", "/"),
+            ],
+        )
+        rows = query_cookie_rows(db_path)
+        names = {r["name"] for r in rows}
+        assert names == {"mod_auth_openidc_state_x", "cf_clearance"}
