@@ -236,7 +236,7 @@ echo '[run] DIAGNOSTIC: toggling bookmarks bar and testing bookmarklet click'
 xdotool key --clearmodifiers ctrl+shift+b
 sleep 1
 snap diag-bookmarks-bar.png
-xdotool mousemove 70 145
+xdotool mousemove 85 95
 xdotool click 1
 sleep 1
 echo "[run] DIAGNOSTIC title after bookmarklet click attempt: $(xdotool getwindowname "$WIN")"
