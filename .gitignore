@@ -12,3 +12,4 @@ CLAUDE.md
 .vercel
 .env*
 docs/superpowers/
+__pycache__/
