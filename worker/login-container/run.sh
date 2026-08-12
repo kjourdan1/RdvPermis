@@ -62,6 +62,54 @@ fi
 source /opt/human-lib.sh
 
 rm -rf /tmp/chromium-profile
+mkdir -p /tmp/chromium-profile/Default
+# Pre-seeds two bookmarks used later (after login+2FA) to fetch creneaux
+# from within this authenticated session instead of relying solely on
+# checkSlots.ts's separate curl request - see
+# docs/superpowers/specs/2026-08-12-browser-fetch-creneaux-design.md and
+# docs/superpowers/notes/2026-08-12-browser-fetch-diagnostic-findings.md
+# for why this is two bookmarks (fetch, then a separate synchronous copy)
+# rather than one - a single fetch-then-copy script left the clipboard
+# empty because Chromium's user-activation window for execCommand('copy')
+# does not survive the async delays between fetches.
+cat > /tmp/chromium-profile/Default/Bookmarks << 'BOOKMARKS_EOF'
+{
+  "checksum": "",
+  "roots": {
+    "bookmark_bar": {
+      "children": [
+        {
+          "date_added": "13350000000000000",
+          "date_last_used": "0",
+          "guid": "00000000-0000-4000-a000-000000000001",
+          "id": "1",
+          "name": "fetch",
+          "type": "url",
+          "url": "javascript:(function(){async function main(){const DEPARTEMENTS=['027','028','077','078'];const results=[];for(const departement of DEPARTEMENTS){try{const res=await fetch(`https://candidat.permisdeconduire.gouv.fr/api/v1/candidat/creneaux?code-departement=${departement}`,{credentials:'include',headers:{Accept:'application/json, text/plain, */*'}});const body=await res.text();results.push({departement,status:res.status,body});}catch(e){results.push({departement,status:0,body:String(e)});}await new Promise(function(resolve){setTimeout(resolve,1000+Math.random()*1000);});}localStorage.setItem('creneauxResult',JSON.stringify(results));document.title='FETCHDONE';}main();})();"
+        },
+        {
+          "date_added": "13350000000000000",
+          "date_last_used": "0",
+          "guid": "00000000-0000-4000-a000-000000000002",
+          "id": "2",
+          "name": "copy",
+          "type": "url",
+          "url": "javascript:(function(){var json=localStorage.getItem('creneauxResult');var ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);document.title=ok?'COPYOK':'COPYFAILED';})();"
+        }
+      ],
+      "date_added": "13350000000000000",
+      "date_modified": "13350000000000000",
+      "id": "0",
+      "name": "Bookmarks bar",
+      "type": "folder"
+    },
+    "other": {"children": [], "date_added": "13350000000000000", "date_modified": "0", "id": "2", "name": "Other bookmarks", "type": "folder"},
+    "synced": {"children": [], "date_added": "13350000000000000", "date_modified": "0", "id": "3", "name": "Mobile bookmarks", "type": "folder"}
+  },
+  "version": 1
+}
+BOOKMARKS_EOF
+
 nohup chromium --user-data-dir=/tmp/chromium-profile --window-size=1280,900 --window-position=0,0 \
   --no-first-run --no-default-browser-check --no-sandbox \
   'https://candidat.permisdeconduire.gouv.fr/' > /tmp/chromium.log 2>&1 &
@@ -202,6 +250,39 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
   exit 1
 fi
 echo '[run] LOGIN SUCCESS'
+
+# Toggling the bookmarks bar here (not earlier) is deliberate - it shifts
+# page content down, which would invalidate the already-calibrated pixel
+# coordinates used by every step above this one (login form, Turnstile,
+# submit, 2FA code entry) if done any earlier. Unlike every other step in
+# this script, this one is NOT allowed to abort the run on failure: the
+# existing cookie-extraction + curl path (right after this block,
+# unchanged) is the fallback checkSlots.ts already knows how to use per
+# departement if this produces nothing usable.
+echo '[run] fetching creneaux from within the browser session'
+xdotool key --clearmodifiers ctrl+shift+b
+sleep 1
+xdotool mousemove 85 95
+xdotool click 1
+sleep 20
+echo "[run] browser-fetch title after fetch click: $(xdotool getwindowname "$WIN")"
+xdotool mousemove 150 95
+xdotool click 1
+sleep 1
+echo "[run] browser-fetch title after copy click: $(xdotool getwindowname "$WIN")"
+snap 5-browser-fetch.png
+set +e
+xclip -selection clipboard -o > /output/creneaux.json 2>/tmp/xclip-err.log
+XCLIP_EXIT=$?
+set -e
+if [[ "$XCLIP_EXIT" -eq 0 ]]; then
+  CRENEAUX_LEN=$(wc -c < /output/creneaux.json)
+  echo "[run] creneaux.json length: $CRENEAUX_LEN"
+else
+  echo '[run] browser-fetch clipboard read failed, checkSlots.ts will fall back to curl per departement'
+  cat /tmp/xclip-err.log || true
+  rm -f /output/creneaux.json
+fi
 
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375

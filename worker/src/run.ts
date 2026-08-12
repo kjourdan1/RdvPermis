@@ -6,6 +6,7 @@ import {
   randomDelayMs,
   SessionExpiredError,
   RateLimitedError,
+  loadPreFetchedCreneaux,
 } from './checkSlots';
 import { findNewCreneaux, creneauKey } from './diff';
 import { formatNewCreneauxMessage, sendTelegramNotification } from './notify';
@@ -39,16 +40,23 @@ export async function run(now: Date = new Date()): Promise<void> {
   const previousCreneaux: Creneau[] = previousState ? previousState.creneaux : [];
   const allCreneaux: Creneau[] = [];
 
+  const preFetched = loadPreFetchedCreneaux('/tmp/rdvpermis-output/creneaux.json');
+
   for (const departement of DEPARTEMENTS) {
     try {
-      const creneaux = await fetchDepartementCreneaux(departement, cookieHeader);
+      const creneaux = await fetchDepartementCreneaux(departement, cookieHeader, preFetched);
       allCreneaux.push(...creneaux);
     } catch (error) {
       if (error instanceof SessionExpiredError) {
-        // The login-container step already verified this same cookie against
-        // this same API before handing off, so an expiry this quickly means
-        // something is genuinely wrong rather than routine session aging --
-        // not worth retrying with the same cookie.
+        // Not worth retrying with the same rejected cookie/session - a
+        // fresh login-container run is what actually changes anything here.
+        // (This used to say the login-container pre-verified the cookie via
+        // a self-test API call before handing off - that self-test was
+        // removed on 2026-08-03 because the duplicate request was itself
+        // flaggable; the assumption that a same-session rejection this
+        // quickly is necessarily anomalous no longer holds as originally
+        // reasoned, though not retrying is still the right call on its own
+        // merits.)
         console.error(`Session rejected while fetching departement ${departement}:`, error);
         process.exitCode = 1;
         return;
