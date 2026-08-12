@@ -1,6 +1,6 @@
 name: Check RdvPermis slots
 
-#on:
+on:
 #  schedule:
     # Peak windows (8h-9h, 11h-14h, 16h-18h Paris time), every 5 min. GitHub
     # Actions cron is always UTC with no DST awareness, so these hours are
@@ -16,7 +16,7 @@ name: Check RdvPermis slots
     # worker/src/config.ts), so this cadence keeps the requests-per-hour
     # against the account at or under the previous, already-proven-safe rate.
 #    - cron: '*/15 0-5,7-8,12-13,16-23 * * *'
-#  workflow_dispatch: {}
+  workflow_dispatch: {}
 
 jobs:
   check:
