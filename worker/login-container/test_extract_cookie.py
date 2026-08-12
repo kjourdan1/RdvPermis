@@ -7,7 +7,7 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA1
 
-from extract_cookie import decrypt_cookie_value, query_cookie_rows
+from extract_cookie import decrypt_cookie_value, query_cookie_rows, build_cookie_header
 
 
 def _encrypt_for_test(plaintext: bytes, host_key: str) -> bytes:
@@ -78,3 +78,17 @@ def test_query_cookie_rows_filters_by_host_and_path():
         rows = query_cookie_rows(db_path)
         names = {r["name"] for r in rows}
         assert names == {"mod_auth_openidc_state_x", "cf_clearance"}
+
+
+def test_build_cookie_header_orders_by_path_length_then_creation_time():
+    cookies = [
+        {"name": "short_path_newer", "value": "v1", "path": "/", "creation_utc": 200},
+        {"name": "short_path_older", "value": "v2", "path": "/", "creation_utc": 100},
+        {"name": "long_path", "value": "v3", "path": "/auth/realms/usager/", "creation_utc": 300},
+    ]
+    result = build_cookie_header(cookies)
+    assert result == "long_path=v3; short_path_older=v2; short_path_newer=v1"
+
+
+def test_build_cookie_header_empty_list():
+    assert build_cookie_header([]) == ""

@@ -64,3 +64,12 @@ def decrypt_cookie_value(encrypted_value: bytes, host_key: str) -> str:
     if prefixed[:digest_len] != expected_prefix:
         raise ValueError(f"host_key digest mismatch decrypting cookie for {host_key!r}")
     return prefixed[digest_len:].decode("utf-8")
+
+
+def build_cookie_header(cookies: list[dict]) -> str:
+    """RFC 6265 §5.4 order: longest path first, then oldest creation
+    time first - matches what a real browser sends, since this
+    codebase already treats fingerprint-level details as things
+    Cloudflare's bot-management can key on (see the spec)."""
+    ordered = sorted(cookies, key=lambda c: (-len(c["path"]), c["creation_utc"]))
+    return "; ".join(f"{c['name']}={c['value']}" for c in ordered)
