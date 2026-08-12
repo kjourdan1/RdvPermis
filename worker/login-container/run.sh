@@ -170,6 +170,9 @@ sleep 1
 # Pi. This is a passive file read - no automation protocol ever
 # attaches to the live Chromium process, same reasoning as why login
 # itself stays GUI-driven instead of CDP-based.
+echo '[run] TEMPORARY DIAGNOSTIC: snapshotting cookie table over time'
+python3 /opt/diagnose_cookies.py /tmp/chromium-profile/Default/Cookies
+
 echo '[run] extracting cookie via sqlite'
 python3 /opt/extract_cookie.py /tmp/chromium-profile/Default/Cookies /output/cookie.txt
 COOKIE_LEN=$(wc -c < /output/cookie.txt)
