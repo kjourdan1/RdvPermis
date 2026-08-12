@@ -175,8 +175,8 @@ def _resolve_required_names(
 ) -> set[str]:
     """Resolves the openidc state cookie's actual random-suffixed name by
     retrying the same bounded number of times as wait_for_required_cookies,
-    with the same sidecar-copying and sqlite3.Error tolerance - a single
-    unretried snapshot risks reading before Chromium has flushed the
+    with the same sidecar-copying and sqlite3.Error/OSError tolerance - a
+    single unretried snapshot risks reading before Chromium has flushed the
     openidc cookie, silently resolving 'required' to just cf_clearance and
     letting the caller return as soon as that one cookie shows up."""
     sleep_fn = sleep_fn or time.sleep
@@ -188,7 +188,7 @@ def _resolve_required_names(
                 required = _required_names_present(query_cookie_rows(dest_path))
                 if required != fallback:
                     return required
-            except sqlite3.Error as e:
+            except (OSError, sqlite3.Error) as e:
                 print(f"[extract_cookie] resolving required cookie names, attempt {attempt}/{max_attempts}: database error ({e.__class__.__name__})")
         if attempt < max_attempts:
             sleep_fn(delay_s)

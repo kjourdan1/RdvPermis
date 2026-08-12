@@ -298,3 +298,13 @@ def test_resolve_required_names_waits_for_openidc_cookie():
         )
 
         assert required == {"cf_clearance", "mod_auth_openidc_state_x"}
+
+
+def test_resolve_required_names_handles_missing_db_gracefully():
+    from extract_cookie import _resolve_required_names
+
+    required = _resolve_required_names(
+        "/nonexistent/path/Cookies", max_attempts=1, delay_s=0, sleep_fn=lambda s: None
+    )
+
+    assert required == {"cf_clearance"}
