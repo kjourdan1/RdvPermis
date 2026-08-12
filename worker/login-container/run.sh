@@ -156,12 +156,6 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
 fi
 echo '[run] LOGIN SUCCESS'
 
-# TEMPORARY diagnostic: preserve the raw Cookies SQLite db so we can inspect
-# its actual schema/host_key/name values for the SQLite-decrypt rewrite.
-# Remove this block once that's done.
-find /tmp/chromium-profile -name Cookies -exec cp {} /output/Cookies-diagnostic \; || true
-echo "[run] diagnostic Cookies db copied: $(ls -la /output/Cookies-diagnostic 2>&1)"
-
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375
 xdotool click 1
