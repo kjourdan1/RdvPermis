@@ -78,9 +78,11 @@ X (Xorg, avec accès direct au GPU du Raspberry Pi via `/dev/dri`) et un Chromiu
 d'automatisation**, piloté entièrement au niveau du serveur X par `xdotool` (souris et clavier
 synthétiques via XTest — indiscernables d'une vraie entrée matérielle pour tout ce qui tourne
 au-dessus du serveur X, CDP y compris son absence). Le rendu GPU réel évite aussi le fallback de
-rendu logiciel que Turnstile peut détecter. Une fois connecté, le cookie de session est extrait via
-l'onglet Network des DevTools (les cookies d'authentification sont `HttpOnly`, donc invisibles à
-`document.cookie`) plutôt que par déchiffrement du store Chromium. Ce cookie est ensuite masqué
+rendu logiciel que Turnstile peut détecter. Une fois connecté, le cookie de session est extrait par lecture directe du
+store de cookies de Chromium sur disque (les cookies d'authentification sont
+`HttpOnly`, donc invisibles à `document.cookie`, mais lisibles - après
+déchiffrement - directement depuis la base SQLite du profil, sans jamais
+attacher de protocole d'automatisation au processus Chromium vivant). Ce cookie est ensuite masqué
 (`::add-mask::`) et passé en variable d'environnement au reste du workflow — voir
 `.github/workflows/check-slots.yml`.
 
