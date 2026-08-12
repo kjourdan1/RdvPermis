@@ -94,7 +94,7 @@ cat > /tmp/chromium-profile/Default/Bookmarks << 'BOOKMARKS_EOF'
           "id": "2",
           "name": "copy",
           "type": "url",
-          "url": "javascript:(function(){var json=localStorage.getItem('creneauxResult');var ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);document.title=ok?'COPYOK':'COPYFAILED';})();"
+          "url": "javascript:(function(){var json=localStorage.getItem('creneauxResult');if(!json){document.title='COPYEMPTY';return;}var ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');document.body.removeChild(ta);document.title=ok?'COPYOK':'COPYFAILED';})();"
         }
       ],
       "date_added": "13350000000000000",
@@ -264,7 +264,11 @@ xdotool key --clearmodifiers ctrl+shift+b
 sleep 1
 xdotool mousemove 85 95
 xdotool click 1
-sleep 20
+for i in $(seq 1 40); do
+  CURRENT_TITLE=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '')
+  [[ "$CURRENT_TITLE" == *"FETCHDONE"* ]] && break
+  sleep 1
+done
 echo "[run] browser-fetch title after fetch click: $(xdotool getwindowname "$WIN")"
 xdotool mousemove 150 95
 xdotool click 1
