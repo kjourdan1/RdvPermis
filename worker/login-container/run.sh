@@ -203,14 +203,6 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
 fi
 echo '[run] LOGIN SUCCESS'
 
-echo '[run] DIAGNOSTIC: minimal javascript: URL test via document.title'
-xdotool key --clearmodifiers ctrl+l
-sleep 0.5
-xdotool type --clearmodifiers "javascript:document.title='JSOK123'"
-xdotool key --clearmodifiers Return
-sleep 1
-echo "[run] DIAGNOSTIC title after javascript: attempt: $(xdotool getwindowname "$WIN")"
-
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375
 xdotool click 1
