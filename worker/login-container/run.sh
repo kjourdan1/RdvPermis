@@ -203,15 +203,6 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
 fi
 echo '[run] LOGIN SUCCESS'
 
-echo '[run] DIAGNOSTIC: testing javascript: URL + clipboard mechanism'
-xdotool key --clearmodifiers ctrl+l
-sleep 0.5
-xdotool type --clearmodifiers "javascript:(function(){fetch('https://candidat.permisdeconduire.gouv.fr/api/v1/candidat/creneaux?code-departement=027',{credentials:'include',headers:{Accept:'application/json, text/plain, */*'}}).then(function(r){return r.text().then(function(b){return {status:r.status,body:b};});}).then(function(result){var ta=document.createElement('textarea');ta.value=JSON.stringify(result);document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);});})();"
-xdotool key --clearmodifiers Return
-sleep 3
-xclip -selection clipboard -o > /output/diagnostic-clipboard.txt 2>&1 || echo 'CLIPBOARD READ FAILED' > /output/diagnostic-clipboard.txt
-cat /output/diagnostic-clipboard.txt
-
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375
 xdotool click 1
