@@ -72,15 +72,17 @@ if [[ -z "$WIN" ]]; then
   exit 1
 fi
 echo "[run] chromium window: $WIN"
+echo "[run] chromium window geometry: $(xdotool getwindowgeometry "$WIN" 2>&1 | tr '\n' ' ')"
 
 # Every scrot call goes through here instead of being called directly, so the
 # CI log has a title + resolution breadcrumb next to each screenshot -- lets
 # you tell from the log alone (no artifact download) whether a given step
 # actually landed on the page it thinks it did.
 snap() {
-  local title
+  local title geom
   title=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '?')
-  echo "[run] snapshot $1 -- title: \"$title\" -- resolution: $(xdpyinfo | awk '/dimensions:/{print $2}')"
+  geom=$(xdotool getwindowgeometry --shell "$WIN" 2>/dev/null | tr '\n' ' ')
+  echo "[run] snapshot $1 -- title: \"$title\" -- resolution: $(xdpyinfo | awk '/dimensions:/{print $2}') -- window: $geom"
   scrot "/output/$1"
 }
 
