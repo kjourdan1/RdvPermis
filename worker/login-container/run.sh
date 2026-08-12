@@ -90,44 +90,50 @@ snap() {
 # in one run, that was the FranceConnect button instead of the cookie
 # banner, sending the whole flow down the wrong provider's login page.
 # There's no CDP here to wait for a real "page loaded" event, so a generous
-# fixed margin is the pragmatic fix.
-sleep 5
+# fixed margin is the pragmatic fix. Margins throughout this login flow were
+# widened again after a run of consecutive failures all landing on the
+# "Mot de passe oublié" page right around the password-fill step - this Pi
+# was under sustained load from repeated docker build/run cycles at the
+# time, and a slow-to-render page + a click that assumes it already has is
+# exactly the failure mode that made the old DevTools extraction flaky too.
+# Trading a few more seconds per run for not racing page renders under load.
+sleep 10
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
-sleep 0.5
+sleep 1
 snap 0-initial.png
 
 echo '[run] accepting cookies'
 move_mouse_human 569 $((665+OFF))
 xdotool click 1
-sleep 2.5
+sleep 5
 snap 0b-after-cookies.png
 
 echo '[run] scrolling to form'
 xdotool mousemove 500 $((500+OFF))
 for i in 1 2 3 4 5 6; do xdotool click 5; sleep 0.08; done
-sleep 1
+sleep 3
 snap 1-form.png
 
 echo '[run] filling email'
 move_mouse_human 495 $((235+OFF))
 xdotool click 1
-sleep 0.9
+sleep 2
 type_human "$EMAIL"
-sleep 1.1
+sleep 2
 
 echo '[run] filling password'
 move_mouse_human 500 $((322+OFF))
 xdotool click 1
-sleep 0.8
+sleep 2
 type_human "$PASSWORD"
-sleep 1.2
+sleep 3
 snap 2-filled.png
 
 echo '[run] clicking turnstile'
 move_mouse_human 453 583
 xdotool click 1
-sleep 4
+sleep 6
 snap 3-turnstile.png
 
 echo '[run] submitting'
