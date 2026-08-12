@@ -62,6 +62,35 @@ fi
 source /opt/human-lib.sh
 
 rm -rf /tmp/chromium-profile
+mkdir -p /tmp/chromium-profile/Default
+cat > /tmp/chromium-profile/Default/Bookmarks << 'BOOKMARKS_EOF'
+{
+  "checksum": "",
+  "roots": {
+    "bookmark_bar": {
+      "children": [
+        {
+          "date_added": "13350000000000000",
+          "date_last_used": "0",
+          "guid": "00000000-0000-4000-a000-000000000001",
+          "id": "1",
+          "name": "fetch",
+          "type": "url",
+          "url": "javascript:document.title='JSOK123'"
+        }
+      ],
+      "date_added": "13350000000000000",
+      "date_modified": "13350000000000000",
+      "id": "0",
+      "name": "Bookmarks bar",
+      "type": "folder"
+    },
+    "other": {"children": [], "date_added": "13350000000000000", "date_modified": "0", "id": "2", "name": "Other bookmarks", "type": "folder"},
+    "synced": {"children": [], "date_added": "13350000000000000", "date_modified": "0", "id": "3", "name": "Mobile bookmarks", "type": "folder"}
+  },
+  "version": 1
+}
+BOOKMARKS_EOF
 nohup chromium --user-data-dir=/tmp/chromium-profile --window-size=1280,900 --window-position=0,0 \
   --no-first-run --no-default-browser-check --no-sandbox \
   'https://candidat.permisdeconduire.gouv.fr/' > /tmp/chromium.log 2>&1 &
@@ -202,6 +231,16 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
   exit 1
 fi
 echo '[run] LOGIN SUCCESS'
+
+echo '[run] DIAGNOSTIC: toggling bookmarks bar and testing bookmarklet click'
+xdotool key --clearmodifiers ctrl+shift+b
+sleep 1
+snap diag-bookmarks-bar.png
+xdotool mousemove 70 145
+xdotool click 1
+sleep 1
+echo "[run] DIAGNOSTIC title after bookmarklet click attempt: $(xdotool getwindowname "$WIN")"
+snap diag-after-click.png
 
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375
