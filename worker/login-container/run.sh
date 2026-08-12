@@ -151,6 +151,28 @@ xdotool click 1
 sleep 10
 snap 4-final.png
 
+# The site now requires a 6-digit email verification code on every login
+# (permanent 2FA rollout, confirmed 2026-08-12) - this step is always
+# present, not conditional, so no page-detection branching is needed,
+# consistent with the rest of this script's fixed-wait/fixed-coordinate
+# style. If something upstream already failed and this page never
+# actually appeared, read_verification_code.py just times out waiting
+# for an email that never gets triggered, and the title check below
+# still correctly reports the real failure.
+echo '[run] waiting for verification code email'
+CODE=$(python3 /opt/read_verification_code.py)
+echo '[run] entering verification code'
+move_mouse_human 632 600
+xdotool click 1
+sleep 1
+type_human "$CODE"
+sleep 1
+snap 5-code-entered.png
+move_mouse_human 687 702
+xdotool click 1
+sleep 5
+snap 6-code-submitted.png
+
 TITLE=$(xdotool getwindowname "$WIN")
 echo "[run] title: $TITLE"
 if [[ "$TITLE" != *'Mon espace candidat'* ]]; then

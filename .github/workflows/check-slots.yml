@@ -35,11 +35,12 @@ jobs:
         env:
           EMAIL: ${{ secrets.EMAIL }}
           PASSWORD: ${{ secrets.PASSWORD }}
+          IONOS_IMAP_PASSWORD: ${{ secrets.IONOS_IMAP_PASSWORD }}
         run: |
           rm -rf /tmp/rdvpermis-output
           mkdir -p /tmp/rdvpermis-output
           docker run --rm --device /dev/dri:/dev/dri \
-            -e EMAIL -e PASSWORD \
+            -e EMAIL -e PASSWORD -e IONOS_IMAP_PASSWORD \
             -v /tmp/rdvpermis-output:/output \
             rdvpermis-login
 
