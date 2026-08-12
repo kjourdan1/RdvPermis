@@ -275,6 +275,14 @@ describe('fetchDepartementCreneaux with pre-fetched data', () => {
     expect(result).toEqual([]);
     expect(mocks.execFile).toHaveBeenCalledTimes(1);
   });
+
+  it('falls back to curl when the pre-fetched entry for a departement is itself an error', async () => {
+    mockCurlResult(200, '[]');
+    const preFetched = new Map([['078', { status: 401, body: 'unauthorized' }]]);
+    const result = await fetchDepartementCreneaux('078', 'session=abc', preFetched);
+    expect(result).toEqual([]);
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('randomDelayMs', () => {

@@ -203,10 +203,18 @@ export async function fetchDepartementCreneaux(
 ): Promise<Creneau[]> {
   const fromBrowser = preFetched.get(departement);
   if (fromBrowser) {
-    console.log(`[checkSlots] departement ${departement}: source=browser-fetch`);
-    return interpretApiResult(departement, fromBrowser);
+    try {
+      const result = interpretApiResult(departement, fromBrowser);
+      console.log(`[checkSlots] departement ${departement}: source=browser-fetch`);
+      return result;
+    } catch (error) {
+      console.log(
+        `[checkSlots] departement ${departement}: browser-fetch failed (${(error as Error).message}), falling back to curl`
+      );
+    }
+  } else {
+    console.log(`[checkSlots] departement ${departement}: source=curl-fallback (no pre-fetched data)`);
   }
-  console.log(`[checkSlots] departement ${departement}: source=curl-fallback`);
 
   const attempt = async (): Promise<Creneau[]> => {
     const { status, body, responseHeaders } = await curlGet(
