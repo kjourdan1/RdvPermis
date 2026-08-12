@@ -93,25 +93,43 @@ def wait_for_required_cookies(
     instead of a single blind sleep."""
     sleep_fn = sleep_fn or time.sleep
     last_missing: set[str] = set(required_names)
+    last_db_error: Exception = None
     for attempt in range(1, max_attempts + 1):
         with tempfile.TemporaryDirectory() as tmp:
-            dest_path = f"{tmp}/Cookies"
-            _copy_fn(source_db_path, dest_path)
-            for sidecar in ("-wal", "-shm"):
-                src_sidecar = source_db_path + sidecar
-                if os.path.exists(src_sidecar):
-                    _copy_fn(src_sidecar, dest_path + sidecar)
-            rows = query_cookie_rows(dest_path)
-            present_names = {r["name"] for r in rows}
-            last_missing = required_names - present_names
-            if not last_missing:
-                return rows
-        print(
-            f"[extract_cookie] attempt {attempt}/{max_attempts}: "
-            f"still missing {sorted(last_missing)}, retrying"
-        )
+            try:
+                dest_path = os.path.join(tmp, "Cookies")
+                _copy_fn(source_db_path, dest_path)
+                for sidecar in ("-wal", "-shm"):
+                    src_sidecar = source_db_path + sidecar
+                    if os.path.exists(src_sidecar):
+                        _copy_fn(src_sidecar, dest_path + sidecar)
+                rows = query_cookie_rows(dest_path)
+                present_names = {r["name"] for r in rows}
+                last_missing = required_names - present_names
+                if not last_missing:
+                    return rows
+            except sqlite3.Error as e:
+                # Torn copy mid-write (Chromium still flushing) - treat as "not ready yet"
+                last_db_error = e
+                last_missing = required_names  # All cookies missing if we can't read the DB
+
+        status = "giving up" if attempt == max_attempts else "retrying"
+        message = f"[extract_cookie] attempt {attempt}/{max_attempts}: "
+        if last_db_error:
+            message += f"database error ({last_db_error.__class__.__name__}), {status}"
+        else:
+            message += f"still missing {sorted(last_missing)}, {status}"
+        print(message)
+
         if attempt < max_attempts:
             sleep_fn(delay_s)
-    raise TimeoutError(
-        f"required cookies never appeared after {max_attempts} attempts: {sorted(last_missing)}"
-    )
+
+    if last_db_error:
+        raise TimeoutError(
+            f"required cookies never appeared after {max_attempts} attempts "
+            f"(last error: {last_db_error.__class__.__name__}: {last_db_error})"
+        )
+    else:
+        raise TimeoutError(
+            f"required cookies never appeared after {max_attempts} attempts: {sorted(last_missing)}"
+        )

@@ -148,3 +148,41 @@ def test_wait_for_required_cookies_times_out():
             assert False, "expected TimeoutError"
         except TimeoutError as e:
             assert "cf_clearance" in str(e)
+
+
+def test_wait_for_required_cookies_handles_malformed_db():
+    """Regression test: torn copy (Chromium mid-write) should retry,
+    not crash with unhandled sqlite3.DatabaseError."""
+    with tempfile.TemporaryDirectory() as tmp:
+        source_path = os.path.join(tmp, "Cookies")
+        # Create a malformed file (simulates torn copy)
+        with open(source_path, "wb") as f:
+            f.write(b"corrupted data " * 10)
+
+        call_count = {"n": 0}
+
+        def fake_copy(src, dst):
+            call_count["n"] += 1
+            if call_count["n"] >= 2:
+                # Simulate recovery on 2nd attempt - write a valid database
+                _make_test_db(
+                    dst,
+                    [
+                        (100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/"),
+                        (200, ".permisdeconduire.gouv.fr", "cf_clearance", b"v10BBBB", "/"),
+                    ],
+                )
+            else:
+                shutil.copy(src, dst)
+
+        # Should NOT crash with unhandled sqlite3.Error - should retry and succeed
+        rows = wait_for_required_cookies(
+            source_path,
+            {"mod_auth_openidc_state_x", "cf_clearance"},
+            max_attempts=5,
+            sleep_fn=lambda s: None,
+            _copy_fn=fake_copy,
+        )
+        names = {r["name"] for r in rows}
+        assert names == {"mod_auth_openidc_state_x", "cf_clearance"}
+        assert call_count["n"] == 2
