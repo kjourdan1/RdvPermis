@@ -76,7 +76,7 @@ cat > /tmp/chromium-profile/Default/Bookmarks << 'BOOKMARKS_EOF'
           "id": "1",
           "name": "fetch",
           "type": "url",
-          "url": "javascript:document.title='JSOK123'"
+          "url": "javascript:(function(){async function main(){const DEPARTEMENTS=['027','028','077','078'];const results=[];for(const departement of DEPARTEMENTS){try{const res=await fetch(`https://candidat.permisdeconduire.gouv.fr/api/v1/candidat/creneaux?code-departement=${departement}`,{credentials:'include',headers:{Accept:'application/json, text/plain, */*'}});const body=await res.text();results.push({departement,status:res.status,body});}catch(e){results.push({departement,status:0,body:String(e)});}await new Promise(function(resolve){setTimeout(resolve,1000+Math.random()*1000);});}const json=JSON.stringify(results);const ta=document.createElement('textarea');ta.value=json;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);document.title='FETCHDONE';}main();})();"
         }
       ],
       "date_added": "13350000000000000",
@@ -232,15 +232,17 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
 fi
 echo '[run] LOGIN SUCCESS'
 
-echo '[run] DIAGNOSTIC: toggling bookmarks bar and testing bookmarklet click'
+echo '[run] DIAGNOSTIC: toggling bookmarks bar and testing full fetch bookmarklet'
 xdotool key --clearmodifiers ctrl+shift+b
 sleep 1
-snap diag-bookmarks-bar.png
 xdotool mousemove 85 95
 xdotool click 1
-sleep 1
-echo "[run] DIAGNOSTIC title after bookmarklet click attempt: $(xdotool getwindowname "$WIN")"
+sleep 20
+echo "[run] DIAGNOSTIC title after fetch bookmarklet: $(xdotool getwindowname "$WIN")"
 snap diag-after-click.png
+xclip -selection clipboard -o > /output/diagnostic-clipboard.txt 2>&1 || echo 'CLIPBOARD READ FAILED' > /output/diagnostic-clipboard.txt
+cat /output/diagnostic-clipboard.txt
+wc -c /output/diagnostic-clipboard.txt
 
 # Dismiss the "Save password?" prompt if Chromium shows one.
 move_mouse_human 1013 375
