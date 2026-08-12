@@ -8,6 +8,7 @@ import hashlib
 import os
 import shutil
 import sqlite3
+import sys
 import tempfile
 import time
 
@@ -134,3 +135,78 @@ def wait_for_required_cookies(
         raise TimeoutError(
             f"required cookies never appeared after {max_attempts} attempts: {sorted(last_missing)}"
         )
+
+
+REQUIRED_COOKIE_NAMES_PREFIXES = ("mod_auth_openidc_state_",)
+REQUIRED_COOKIE_NAMES_EXACT = ("cf_clearance",)
+
+
+def _required_names_present(rows: list[dict]) -> set[str]:
+    """The openidc state cookie's name has a random suffix, so we can't
+    match it by exact name up front - this resolves the *actual* required
+    name set against whatever's really in the db, for wait_for_required_cookies
+    to check against on each attempt."""
+    names = {r["name"] for r in rows}
+    required = set(REQUIRED_COOKIE_NAMES_EXACT)
+    for name in names:
+        if name.startswith(REQUIRED_COOKIE_NAMES_PREFIXES):
+            required.add(name)
+    return required
+
+
+REQUIRED_COOKIE_NAMES = REQUIRED_COOKIE_NAMES_EXACT + REQUIRED_COOKIE_NAMES_PREFIXES
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 2:
+        print("usage: extract_cookie.py <cookies_db_path> <output_path> [--max-attempts=N] [--delay=S]", file=sys.stderr)
+        return 1
+    db_path, output_path = argv[0], argv[1]
+    max_attempts = 10
+    delay_s = 1.0
+    for arg in argv[2:]:
+        if arg.startswith("--max-attempts="):
+            max_attempts = int(arg.split("=", 1)[1])
+        elif arg.startswith("--delay="):
+            delay_s = float(arg.split("=", 1)[1])
+
+    # First pass: see what's actually in there right now, so we know the
+    # real required-name set (including the random openidc suffix)
+    # before starting the retry loop proper.
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            probe_path = f"{tmp}/Cookies"
+            shutil.copy(db_path, probe_path)
+            probe_rows = query_cookie_rows(probe_path)
+    except OSError as e:
+        print(f"[extract_cookie] could not read {db_path}: {e}", file=sys.stderr)
+        return 1
+
+    required = _required_names_present(probe_rows) or set(REQUIRED_COOKIE_NAMES_EXACT)
+
+    try:
+        rows = wait_for_required_cookies(
+            db_path, required, max_attempts=max_attempts, delay_s=delay_s
+        )
+    except TimeoutError as e:
+        print(f"[extract_cookie] {e}", file=sys.stderr)
+        return 1
+
+    decrypted = []
+    for row in rows:
+        try:
+            value = decrypt_cookie_value(row["encrypted_value"], row["host_key"])
+        except ValueError as e:
+            print(f"[extract_cookie] failed to decrypt cookie {row['name']!r}: {e}", file=sys.stderr)
+            return 1
+        decrypted.append({**row, "value": value})
+
+    header = build_cookie_header(decrypted)
+    with open(output_path, "w") as f:
+        f.write(header)
+    print(f"[extract_cookie] wrote {len(decrypted)} cookies to {output_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

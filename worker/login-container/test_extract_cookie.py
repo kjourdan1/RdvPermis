@@ -225,3 +225,44 @@ def test_wait_for_required_cookies_clears_stale_error_state():
             assert "cf_clearance" in error_msg
             assert "DatabaseError" not in error_msg
             assert "database error" not in error_msg.lower()
+
+
+def test_main_writes_cookie_header_on_success():
+    from extract_cookie import main, REQUIRED_COOKIE_NAMES
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "Cookies")
+        out_path = os.path.join(tmp, "cookie.txt")
+        rows = []
+        for name, host_key in [
+            ("mod_auth_openidc_state_x", "candidat.permisdeconduire.gouv.fr"),
+            ("cf_clearance", ".permisdeconduire.gouv.fr"),
+        ]:
+            encrypted = _encrypt_for_test(f"val_{name}".encode(), host_key)
+            rows.append((100, host_key, name, encrypted, "/"))
+        _make_test_db(db_path, rows)
+
+        exit_code = main([db_path, out_path])
+
+        assert exit_code == 0
+        with open(out_path) as f:
+            content = f.read()
+        assert "mod_auth_openidc_state_x=val_mod_auth_openidc_state_x" in content
+        assert "cf_clearance=val_cf_clearance" in content
+
+
+def test_main_fails_when_required_cookie_missing():
+    from extract_cookie import main
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "Cookies")
+        out_path = os.path.join(tmp, "cookie.txt")
+        _make_test_db(
+            db_path,
+            [(100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/")],
+        )
+
+        exit_code = main([db_path, out_path, "--max-attempts=1", "--delay=0"])
+
+        assert exit_code == 1
+        assert not os.path.exists(out_path)
