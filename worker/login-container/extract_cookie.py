@@ -5,7 +5,11 @@ DevTools via blind pixel-coordinate clicks. See
 docs/superpowers/specs/2026-08-12-cookie-extraction-sqlite.md for why.
 """
 import hashlib
+import os
+import shutil
 import sqlite3
+import tempfile
+import time
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
@@ -73,3 +77,41 @@ def build_cookie_header(cookies: list[dict]) -> str:
     Cloudflare's bot-management can key on (see the spec)."""
     ordered = sorted(cookies, key=lambda c: (-len(c["path"]), c["creation_utc"]))
     return "; ".join(f"{c['name']}={c['value']}" for c in ordered)
+
+
+def wait_for_required_cookies(
+    source_db_path: str,
+    required_names: set[str],
+    *,
+    max_attempts: int = 10,
+    delay_s: float = 1.0,
+    sleep_fn=None,
+    _copy_fn=shutil.copy,
+) -> list[dict]:
+    """Chromium may not have flushed the very latest cookie writes to
+    disk the instant login completes - retries a bounded number of times
+    instead of a single blind sleep."""
+    sleep_fn = sleep_fn or time.sleep
+    last_missing: set[str] = set(required_names)
+    for attempt in range(1, max_attempts + 1):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest_path = f"{tmp}/Cookies"
+            _copy_fn(source_db_path, dest_path)
+            for sidecar in ("-wal", "-shm"):
+                src_sidecar = source_db_path + sidecar
+                if os.path.exists(src_sidecar):
+                    _copy_fn(src_sidecar, dest_path + sidecar)
+            rows = query_cookie_rows(dest_path)
+            present_names = {r["name"] for r in rows}
+            last_missing = required_names - present_names
+            if not last_missing:
+                return rows
+        print(
+            f"[extract_cookie] attempt {attempt}/{max_attempts}: "
+            f"still missing {sorted(last_missing)}, retrying"
+        )
+        if attempt < max_attempts:
+            sleep_fn(delay_s)
+    raise TimeoutError(
+        f"required cookies never appeared after {max_attempts} attempts: {sorted(last_missing)}"
+    )

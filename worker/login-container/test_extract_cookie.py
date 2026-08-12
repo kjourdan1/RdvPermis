@@ -2,12 +2,13 @@ import hashlib
 import sqlite3
 import tempfile
 import os
+import shutil
 
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Hash import SHA1
 
-from extract_cookie import decrypt_cookie_value, query_cookie_rows, build_cookie_header
+from extract_cookie import decrypt_cookie_value, query_cookie_rows, build_cookie_header, wait_for_required_cookies
 
 
 def _encrypt_for_test(plaintext: bytes, host_key: str) -> bytes:
@@ -92,3 +93,58 @@ def test_build_cookie_header_orders_by_path_length_then_creation_time():
 
 def test_build_cookie_header_empty_list():
     assert build_cookie_header([]) == ""
+
+
+def test_wait_for_required_cookies_retries_until_present():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_path = os.path.join(tmp, "Cookies")
+        _make_test_db(
+            source_path,
+            [(100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/")],
+        )
+
+        call_count = {"n": 0}
+
+        def fake_copy(src, dst):
+            call_count["n"] += 1
+            if call_count["n"] >= 3:
+                # Simulate Chromium finishing its write on the 3rd attempt.
+                _make_test_db(
+                    dst,
+                    [
+                        (100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/"),
+                        (200, ".permisdeconduire.gouv.fr", "cf_clearance", b"v10BBBB", "/"),
+                    ],
+                )
+            else:
+                shutil.copy(src, dst)
+
+        rows = wait_for_required_cookies(
+            source_path,
+            {"mod_auth_openidc_state_x", "cf_clearance"},
+            max_attempts=10,
+            sleep_fn=lambda s: None,
+            _copy_fn=fake_copy,
+        )
+        names = {r["name"] for r in rows}
+        assert names == {"mod_auth_openidc_state_x", "cf_clearance"}
+        assert call_count["n"] == 3
+
+
+def test_wait_for_required_cookies_times_out():
+    with tempfile.TemporaryDirectory() as tmp:
+        source_path = os.path.join(tmp, "Cookies")
+        _make_test_db(
+            source_path,
+            [(100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/")],
+        )
+        try:
+            wait_for_required_cookies(
+                source_path,
+                {"mod_auth_openidc_state_x", "cf_clearance"},
+                max_attempts=3,
+                sleep_fn=lambda s: None,
+            )
+            assert False, "expected TimeoutError"
+        except TimeoutError as e:
+            assert "cf_clearance" in str(e)
