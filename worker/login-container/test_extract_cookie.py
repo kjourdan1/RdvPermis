@@ -186,3 +186,42 @@ def test_wait_for_required_cookies_handles_malformed_db():
         names = {r["name"] for r in rows}
         assert names == {"mod_auth_openidc_state_x", "cf_clearance"}
         assert call_count["n"] == 2
+
+
+def test_wait_for_required_cookies_clears_stale_error_state():
+    """Regression test: if attempt 1 raises sqlite3.Error but attempt 2+
+    read the DB cleanly (but cookies are missing), the final TimeoutError
+    should report missing cookie names, not the stale attempt-1 error."""
+    with tempfile.TemporaryDirectory() as tmp:
+        source_path = os.path.join(tmp, "Cookies")
+        _make_test_db(
+            source_path,
+            [(100, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x", b"v10AAAA", "/")],
+        )
+
+        call_count = {"n": 0}
+
+        def fake_copy(src, dst):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # Simulate torn copy on first attempt
+                raise sqlite3.DatabaseError("file is not a database")
+            else:
+                # Subsequent attempts: copy the real (but incomplete) DB
+                shutil.copy(src, dst)
+
+        try:
+            wait_for_required_cookies(
+                source_path,
+                {"mod_auth_openidc_state_x", "cf_clearance"},
+                max_attempts=3,
+                sleep_fn=lambda s: None,
+                _copy_fn=fake_copy,
+            )
+            assert False, "expected TimeoutError"
+        except TimeoutError as e:
+            error_msg = str(e)
+            # Should report missing cookie names, not the stale database error
+            assert "cf_clearance" in error_msg
+            assert "DatabaseError" not in error_msg
+            assert "database error" not in error_msg.lower()

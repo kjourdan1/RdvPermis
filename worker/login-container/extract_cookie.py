@@ -93,10 +93,11 @@ def wait_for_required_cookies(
     instead of a single blind sleep."""
     sleep_fn = sleep_fn or time.sleep
     last_missing: set[str] = set(required_names)
-    last_db_error: Exception = None
+    last_db_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         with tempfile.TemporaryDirectory() as tmp:
             try:
+                last_db_error = None  # Reset error state at start of each attempt
                 dest_path = os.path.join(tmp, "Cookies")
                 _copy_fn(source_db_path, dest_path)
                 for sidecar in ("-wal", "-shm"):
