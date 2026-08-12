@@ -80,6 +80,19 @@ def build_cookie_header(cookies: list[dict]) -> str:
     return "; ".join(f"{c['name']}={c['value']}" for c in ordered)
 
 
+def _copy_db_with_sidecars(source_db_path: str, dest_dir: str, _copy_fn=shutil.copy) -> str:
+    """Copies the Cookies file plus its -wal/-shm sidecars (if present) into
+    dest_dir, so callers never read against Chromium's live, possibly
+    mid-write file. Returns the copied Cookies path."""
+    dest_path = os.path.join(dest_dir, "Cookies")
+    _copy_fn(source_db_path, dest_path)
+    for sidecar in ("-wal", "-shm"):
+        src_sidecar = source_db_path + sidecar
+        if os.path.exists(src_sidecar):
+            _copy_fn(src_sidecar, dest_path + sidecar)
+    return dest_path
+
+
 def wait_for_required_cookies(
     source_db_path: str,
     required_names: set[str],
@@ -99,12 +112,7 @@ def wait_for_required_cookies(
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 last_db_error = None  # Reset error state at start of each attempt
-                dest_path = os.path.join(tmp, "Cookies")
-                _copy_fn(source_db_path, dest_path)
-                for sidecar in ("-wal", "-shm"):
-                    src_sidecar = source_db_path + sidecar
-                    if os.path.exists(src_sidecar):
-                        _copy_fn(src_sidecar, dest_path + sidecar)
+                dest_path = _copy_db_with_sidecars(source_db_path, tmp, _copy_fn=_copy_fn)
                 rows = query_cookie_rows(dest_path)
                 present_names = {r["name"] for r in rows}
                 last_missing = required_names - present_names
@@ -157,6 +165,36 @@ def _required_names_present(rows: list[dict]) -> set[str]:
 REQUIRED_COOKIE_NAMES = REQUIRED_COOKIE_NAMES_EXACT + REQUIRED_COOKIE_NAMES_PREFIXES
 
 
+def _resolve_required_names(
+    db_path: str,
+    *,
+    max_attempts: int = 10,
+    delay_s: float = 1.0,
+    sleep_fn=None,
+    _copy_fn=shutil.copy,
+) -> set[str]:
+    """Resolves the openidc state cookie's actual random-suffixed name by
+    retrying the same bounded number of times as wait_for_required_cookies,
+    with the same sidecar-copying and sqlite3.Error tolerance - a single
+    unretried snapshot risks reading before Chromium has flushed the
+    openidc cookie, silently resolving 'required' to just cf_clearance and
+    letting the caller return as soon as that one cookie shows up."""
+    sleep_fn = sleep_fn or time.sleep
+    fallback = set(REQUIRED_COOKIE_NAMES_EXACT)
+    for attempt in range(1, max_attempts + 1):
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                dest_path = _copy_db_with_sidecars(db_path, tmp, _copy_fn=_copy_fn)
+                required = _required_names_present(query_cookie_rows(dest_path))
+                if required != fallback:
+                    return required
+            except sqlite3.Error as e:
+                print(f"[extract_cookie] resolving required cookie names, attempt {attempt}/{max_attempts}: database error ({e.__class__.__name__})")
+        if attempt < max_attempts:
+            sleep_fn(delay_s)
+    return fallback
+
+
 def main(argv: list[str]) -> int:
     if len(argv) < 2:
         print("usage: extract_cookie.py <cookies_db_path> <output_path> [--max-attempts=N] [--delay=S]", file=sys.stderr)
@@ -170,19 +208,11 @@ def main(argv: list[str]) -> int:
         elif arg.startswith("--delay="):
             delay_s = float(arg.split("=", 1)[1])
 
-    # First pass: see what's actually in there right now, so we know the
-    # real required-name set (including the random openidc suffix)
-    # before starting the retry loop proper.
-    try:
-        with tempfile.TemporaryDirectory() as tmp:
-            probe_path = f"{tmp}/Cookies"
-            shutil.copy(db_path, probe_path)
-            probe_rows = query_cookie_rows(probe_path)
-    except OSError as e:
-        print(f"[extract_cookie] could not read {db_path}: {e}", file=sys.stderr)
-        return 1
-
-    required = _required_names_present(probe_rows) or set(REQUIRED_COOKIE_NAMES_EXACT)
+    # Resolves the openidc state cookie's real (random-suffixed) name
+    # before starting the retry loop proper - retry-safe and sqlite3.Error
+    # tolerant the same way wait_for_required_cookies is, since this reads
+    # the same live, possibly mid-write database.
+    required = _resolve_required_names(db_path, max_attempts=max_attempts, delay_s=delay_s)
 
     try:
         rows = wait_for_required_cookies(

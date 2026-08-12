@@ -228,7 +228,7 @@ def test_wait_for_required_cookies_clears_stale_error_state():
 
 
 def test_main_writes_cookie_header_on_success():
-    from extract_cookie import main, REQUIRED_COOKIE_NAMES
+    from extract_cookie import main
 
     with tempfile.TemporaryDirectory() as tmp:
         db_path = os.path.join(tmp, "Cookies")
@@ -266,3 +266,35 @@ def test_main_fails_when_required_cookie_missing():
 
         assert exit_code == 1
         assert not os.path.exists(out_path)
+
+
+def test_resolve_required_names_waits_for_openidc_cookie():
+    from extract_cookie import _resolve_required_names
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "Cookies")
+        partial_path = os.path.join(tmp, "partial")
+        full_path = os.path.join(tmp, "full")
+        _make_test_db(partial_path, [
+            (100, ".permisdeconduire.gouv.fr", "cf_clearance",
+             _encrypt_for_test(b"val", ".permisdeconduire.gouv.fr"), "/"),
+        ])
+        _make_test_db(full_path, [
+            (100, ".permisdeconduire.gouv.fr", "cf_clearance",
+             _encrypt_for_test(b"val", ".permisdeconduire.gouv.fr"), "/"),
+            (200, "candidat.permisdeconduire.gouv.fr", "mod_auth_openidc_state_x",
+             _encrypt_for_test(b"val2", "candidat.permisdeconduire.gouv.fr"), "/"),
+        ])
+
+        calls = {"n": 0}
+
+        def fake_copy(src, dst):
+            calls["n"] += 1
+            source = partial_path if calls["n"] < 3 else full_path
+            shutil.copy(source, dst)
+
+        required = _resolve_required_names(
+            db_path, max_attempts=5, delay_s=0, sleep_fn=lambda s: None, _copy_fn=fake_copy
+        )
+
+        assert required == {"cf_clearance", "mod_auth_openidc_state_x"}
