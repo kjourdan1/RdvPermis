@@ -301,10 +301,42 @@ def test_resolve_required_names_waits_for_openidc_cookie():
 
 
 def test_resolve_required_names_handles_missing_db_gracefully():
+    """A missing db is treated as 'not ready yet', same as any other
+    OSError - it still must not silently fall back to cf_clearance-only
+    once the retry budget is exhausted."""
     from extract_cookie import _resolve_required_names
 
-    required = _resolve_required_names(
-        "/nonexistent/path/Cookies", max_attempts=1, delay_s=0, sleep_fn=lambda s: None
-    )
+    try:
+        _resolve_required_names(
+            "/nonexistent/path/Cookies", max_attempts=1, delay_s=0, sleep_fn=lambda s: None
+        )
+        assert False, "expected TimeoutError"
+    except TimeoutError as e:
+        assert "cf_clearance" in str(e)
 
-    assert required == {"cf_clearance"}
+
+def test_resolve_required_names_raises_when_openidc_cookie_never_appears():
+    """Regression test: if only cf_clearance is ever present (the openidc
+    state cookie never shows up within max_attempts), _resolve_required_names
+    must raise TimeoutError instead of silently falling back to
+    {'cf_clearance'} - a silent fallback would let wait_for_required_cookies
+    trivially succeed on cf_clearance alone (Cloudflare sets that cookie long
+    before login completes), producing an auth-less cookie header with exit
+    code 0 instead of a loud failure."""
+    from extract_cookie import _resolve_required_names
+
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "Cookies")
+        _make_test_db(
+            db_path,
+            [(100, ".permisdeconduire.gouv.fr", "cf_clearance",
+              _encrypt_for_test(b"val", ".permisdeconduire.gouv.fr"), "/")],
+        )
+
+        try:
+            _resolve_required_names(
+                db_path, max_attempts=2, delay_s=0, sleep_fn=lambda s: None
+            )
+            assert False, "expected TimeoutError"
+        except TimeoutError as e:
+            assert "cf_clearance" in str(e)

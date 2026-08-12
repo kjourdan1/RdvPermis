@@ -118,7 +118,7 @@ def wait_for_required_cookies(
                 last_missing = required_names - present_names
                 if not last_missing:
                     return rows
-            except sqlite3.Error as e:
+            except (OSError, sqlite3.Error) as e:
                 # Torn copy mid-write (Chromium still flushing) - treat as "not ready yet"
                 last_db_error = e
                 last_missing = required_names  # All cookies missing if we can't read the DB
@@ -175,13 +175,16 @@ def _resolve_required_names(
 ) -> set[str]:
     """Resolves the openidc state cookie's actual random-suffixed name by
     retrying the same bounded number of times as wait_for_required_cookies,
-    with the same sidecar-copying and sqlite3.Error/OSError tolerance - a
-    single unretried snapshot risks reading before Chromium has flushed the
-    openidc cookie, silently resolving 'required' to just cf_clearance and
-    letting the caller return as soon as that one cookie shows up."""
+    with the same sidecar-copying and (OSError, sqlite3.Error) tolerance -
+    raises TimeoutError if the openidc cookie never shows up, rather than
+    silently falling back to just cf_clearance (which wait_for_required_cookies
+    would then trivially satisfy, since Cloudflare sets that cookie long
+    before login completes - producing an auth-less cookie header with
+    exit code 0 instead of a loud failure)."""
     sleep_fn = sleep_fn or time.sleep
     fallback = set(REQUIRED_COOKIE_NAMES_EXACT)
     for attempt in range(1, max_attempts + 1):
+        db_error: Exception | None = None
         with tempfile.TemporaryDirectory() as tmp:
             try:
                 dest_path = _copy_db_with_sidecars(db_path, tmp, _copy_fn=_copy_fn)
@@ -189,10 +192,21 @@ def _resolve_required_names(
                 if required != fallback:
                     return required
             except (OSError, sqlite3.Error) as e:
-                print(f"[extract_cookie] resolving required cookie names, attempt {attempt}/{max_attempts}: database error ({e.__class__.__name__})")
+                db_error = e
+
+        status = "giving up" if attempt == max_attempts else "retrying"
+        if db_error:
+            print(f"[extract_cookie] resolving required cookie names, attempt {attempt}/{max_attempts}: database error ({db_error.__class__.__name__}), {status}")
+        else:
+            print(f"[extract_cookie] resolving required cookie names, attempt {attempt}/{max_attempts}: openidc state cookie not yet present, {status}")
+
         if attempt < max_attempts:
             sleep_fn(delay_s)
-    return fallback
+
+    raise TimeoutError(
+        f"could not resolve the openidc state cookie's name after {max_attempts} attempts "
+        "(only cf_clearance was ever observed - login may not have actually completed)"
+    )
 
 
 def main(argv: list[str]) -> int:
@@ -200,7 +214,7 @@ def main(argv: list[str]) -> int:
         print("usage: extract_cookie.py <cookies_db_path> <output_path> [--max-attempts=N] [--delay=S]", file=sys.stderr)
         return 1
     db_path, output_path = argv[0], argv[1]
-    max_attempts = 10
+    max_attempts = 30
     delay_s = 1.0
     for arg in argv[2:]:
         if arg.startswith("--max-attempts="):
@@ -209,12 +223,12 @@ def main(argv: list[str]) -> int:
             delay_s = float(arg.split("=", 1)[1])
 
     # Resolves the openidc state cookie's real (random-suffixed) name
-    # before starting the retry loop proper - retry-safe and sqlite3.Error
-    # tolerant the same way wait_for_required_cookies is, since this reads
-    # the same live, possibly mid-write database.
-    required = _resolve_required_names(db_path, max_attempts=max_attempts, delay_s=delay_s)
-
+    # before starting the retry loop proper - retry-safe and
+    # (OSError, sqlite3.Error) tolerant the same way wait_for_required_cookies
+    # is, since this reads the same live, possibly mid-write database. Both
+    # raise TimeoutError the same way if their retry budget runs out.
     try:
+        required = _resolve_required_names(db_path, max_attempts=max_attempts, delay_s=delay_s)
         rows = wait_for_required_cookies(
             db_path, required, max_attempts=max_attempts, delay_s=delay_s
         )
