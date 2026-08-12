@@ -117,15 +117,22 @@ for i in 1 2 3 4 5 6; do xdotool click 5; sleep 0.08; done
 sleep 3
 snap 1-form.png
 
+# Coordinates below (email through submit) were recalibrated on 2026-08-12
+# after 5 consecutive runs misclicked "Mot de passe oublié ?" instead of the
+# password field: pixel-sampled a real failing run's screenshot and found
+# every one of these targets landing on flat page background (246,246,246)
+# rather than on the actual input/button fills - all four were consistently
+# ~55-60px too low, not just the password one. Corrected against the same
+# screenshot's real element positions.
 echo '[run] filling email'
-move_mouse_human 495 $((235+OFF))
+move_mouse_human 495 $((176+OFF))
 xdotool click 1
 sleep 2
 type_human "$EMAIL"
 sleep 2
 
 echo '[run] filling password'
-move_mouse_human 500 $((322+OFF))
+move_mouse_human 500 $((269+OFF))
 xdotool click 1
 sleep 2
 type_human "$PASSWORD"
@@ -133,13 +140,13 @@ sleep 3
 snap 2-filled.png
 
 echo '[run] clicking turnstile'
-move_mouse_human 453 583
+move_mouse_human 453 522
 xdotool click 1
 sleep 6
 snap 3-turnstile.png
 
 echo '[run] submitting'
-move_mouse_human 632 665
+move_mouse_human 632 605
 xdotool click 1
 sleep 10
 snap 4-final.png
