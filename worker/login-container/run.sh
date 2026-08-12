@@ -161,63 +161,18 @@ move_mouse_human 1013 375
 xdotool click 1
 sleep 1
 
-# Extract the session cookie via DevTools instead of Chromium's on-disk
-# cookie store: the auth cookies are HttpOnly (invisible to document.cookie),
-# and reverse-engineering Chromium's current cookie-encryption scheme turned
-# out to be a dead end. The Network panel's raw request headers show
-# HttpOnly cookies too, and a plain triple-click + copy lifts the exact
-# Cookie header string checkSlots.ts needs -- no crypto involved.
-echo '[run] extracting cookie via devtools'
-xdotool key --clearmodifiers F12
-sleep 3
-xdotool mousemove 1038 157; xdotool click 1; sleep 1
-# Chromium's own reload button, not DevTools' inline "Reload page" button --
-# the latter never registered a click reliably in this environment. The
-# Network tab has to actually be recording *before* the click, and the page
-# needs time to reload and finish fetching before we go looking for the
-# request row -- both steps that were racing ahead of the real page state
-# on the CI runner (see the two timing fixes above this one).
-xdotool mousemove 95 63; xdotool click 1
-# Was `sleep 6`, bumped after three straight failures one evening (all with
-# an empty Network panel in the diagnostics -- "Currently recording network
-# activity", meaning the reload hadn't produced a single request yet) right
-# after two clean runs earlier the same afternoon with the same code. Same
-# site, same script, same day -- the site itself was just slower to respond
-# that evening, not a coordinates issue.
-sleep 15
-# Filter to "Doc" requests only first: by the time we get here there can be
-# dozens of requests loaded (fonts, scripts, images...), so a fixed pixel
-# position for "the top row" isn't reliable -- it hit a font file's row in
-# one CI run. Filtering down to the one document request first makes its
-# row position deterministic regardless of how much else has loaded.
-xdotool mousemove 853 261; xdotool click 1; sleep 1
-xdotool mousemove 830 392; xdotool click 1
-sleep 2
-snap 5-network.png
-xdotool mousemove 1100 650
-for i in 1 2 3 4 5 6 7 8 9 10 11; do xdotool click 5; sleep 0.1; done
-sleep 0.5
-snap 6-headers-scrolled.png
-xdotool mousemove 1100 700
-xdotool click --repeat 3 --delay 80 1
-sleep 0.5
-xdotool key --clearmodifiers ctrl+c
-sleep 0.3
-xclip -selection clipboard -o > /output/cookie.txt
-wc -c /output/cookie.txt
-
-# Deliberately not making our own test request to the real API here: it
-# would hit the exact same department (078, first in DEPARTEMENTS) that the
-# worker's own first request hits moments later, and one CI run saw that
-# second identical request get rejected as a session error -- two requests
-# for the same thing, seconds apart, from the same IP, is itself a pattern
-# Cloudflare's bot-management may score independently of cookie validity.
-# A byte-count check is enough to confirm devtools actually copied something.
+# Extract the session cookie by reading Chromium's on-disk SQLite db
+# directly instead of driving DevTools - see
+# docs/superpowers/specs/2026-08-12-cookie-extraction-sqlite.md for why
+# the DevTools approach (F12 + blind pixel-coordinate clicks through the
+# Network tab) was replaced: it broke whenever DevTools didn't land
+# exactly where expected, made worse by CPU contention on this shared
+# Pi. This is a passive file read - no automation protocol ever
+# attaches to the live Chromium process, same reasoning as why login
+# itself stays GUI-driven instead of CDP-based.
+echo '[run] extracting cookie via sqlite'
+python3 /opt/extract_cookie.py /tmp/chromium-profile/Default/Cookies /output/cookie.txt
 COOKIE_LEN=$(wc -c < /output/cookie.txt)
 echo "[run] cookie length: $COOKIE_LEN"
-if [[ "$COOKIE_LEN" -lt 20 ]]; then
-  echo '[run] cookie.txt looks empty or truncated'
-  exit 1
-fi
 
 echo '[run] DONE'
