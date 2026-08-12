@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY human-lib.sh /opt/human-lib.sh
 COPY extract_cookie.py /opt/extract_cookie.py
-COPY diagnose_cookies.py /opt/diagnose_cookies.py
 COPY run.sh /opt/run.sh
 RUN chmod +x /opt/run.sh
 
