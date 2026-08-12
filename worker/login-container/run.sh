@@ -240,8 +240,15 @@ xdotool click 1
 sleep 20
 echo "[run] DIAGNOSTIC title after fetch bookmarklet: $(xdotool getwindowname "$WIN")"
 snap diag-after-click.png
-xclip -selection clipboard -o > /output/diagnostic-clipboard.txt 2>&1 || echo 'CLIPBOARD READ FAILED' > /output/diagnostic-clipboard.txt
+set +e
+xclip -selection clipboard -o > /output/diagnostic-clipboard.txt 2>/output/diagnostic-clipboard-stderr.txt
+XCLIP_EXIT=$?
+set -e
+echo "[run] xclip exit code: $XCLIP_EXIT"
+echo '[run] xclip stdout:'
 cat /output/diagnostic-clipboard.txt
+echo '[run] xclip stderr:'
+cat /output/diagnostic-clipboard-stderr.txt
 wc -c /output/diagnostic-clipboard.txt
 
 # Dismiss the "Save password?" prompt if Chromium shows one.
