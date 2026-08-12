@@ -4,9 +4,9 @@ import tempfile
 import os
 import shutil
 
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA1
+from Cryptodome.Cipher import AES
+from Cryptodome.Protocol.KDF import PBKDF2
+from Cryptodome.Hash import SHA1
 
 from extract_cookie import decrypt_cookie_value, query_cookie_rows, build_cookie_header, wait_for_required_cookies
 

@@ -12,10 +12,10 @@ import sys
 import tempfile
 import time
 
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA1
-from Crypto.Util.Padding import unpad
+from Cryptodome.Cipher import AES
+from Cryptodome.Protocol.KDF import PBKDF2
+from Cryptodome.Hash import SHA1
+from Cryptodome.Util.Padding import unpad
 
 
 TARGET_HOST_KEYS = ("candidat.permisdeconduire.gouv.fr", ".permisdeconduire.gouv.fr")
