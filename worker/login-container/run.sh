@@ -302,9 +302,25 @@ sleep 1
 # Pi. This is a passive file read - no automation protocol ever
 # attaches to the live Chromium process, same reasoning as why login
 # itself stays GUI-driven instead of CDP-based.
+#
+# No longer fatal here (unlike when this was the only source of session
+# data): the browser-fetch step above can independently supply everything
+# checkSlots.ts needs, so a failure here - the openidc state cookie
+# occasionally never appears in time, a known intermittent issue - no
+# longer needs to abort the whole run. Whichever of the two actually
+# produced usable data is what determines success now, decided
+# downstream by the "Export cookie header" workflow step and
+# checkSlots.ts's own per-departement fallback, not here.
 echo '[run] extracting cookie via sqlite'
+set +e
 python3 /opt/extract_cookie.py /tmp/chromium-profile/Default/Cookies /output/cookie.txt
-COOKIE_LEN=$(wc -c < /output/cookie.txt)
-echo "[run] cookie length: $COOKIE_LEN"
+EXTRACT_EXIT=$?
+set -e
+if [[ "$EXTRACT_EXIT" -eq 0 ]]; then
+  COOKIE_LEN=$(wc -c < /output/cookie.txt)
+  echo "[run] cookie length: $COOKIE_LEN"
+else
+  echo '[run] cookie extraction failed, relying on browser-fetched data (if any) for this run'
+fi
 
 echo '[run] DONE'
