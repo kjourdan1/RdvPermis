@@ -63,8 +63,21 @@ jobs:
 
       - name: Export cookie header for later steps
         run: |
-          COOKIE=$(cat /tmp/rdvpermis-output/cookie.txt)
-          echo "::add-mask::$COOKIE"
+          # cookie.txt may be missing if extract_cookie.py failed - a known,
+          # intermittent, separate issue (the openidc state cookie
+          # occasionally never appears in time). No longer fatal here: now
+          # that checkSlots.ts can run entirely on browser-fetched data
+          # when it's available, an empty COOKIE_HEADER just means any
+          # departement checkSlots.ts can't cover via browser-fetch will
+          # correctly fail with SessionExpiredError for that departement
+          # instead of this step artificially failing the whole run over a
+          # cookie that may not have even been needed.
+          COOKIE=$(cat /tmp/rdvpermis-output/cookie.txt 2>/dev/null || echo '')
+          if [[ -n "$COOKIE" ]]; then
+            echo "::add-mask::$COOKIE"
+          else
+            echo '[export-cookie] cookie.txt missing - proceeding with an empty cookie, relying on browser-fetched data'
+          fi
           echo "COOKIE_HEADER=$COOKIE" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
