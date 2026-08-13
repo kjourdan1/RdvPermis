@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   writeState: vi.fn(),
   fetchDepartementCreneaux: vi.fn(),
   sendTelegramNotification: vi.fn(),
+  loadPreFetchedCreneaux: vi.fn(),
 }));
 
 vi.mock('./config', async () => {
@@ -17,7 +18,11 @@ vi.mock('./storage', () => ({
 }));
 vi.mock('./checkSlots', async () => {
   const actual = await vi.importActual<typeof import('./checkSlots')>('./checkSlots');
-  return { ...actual, fetchDepartementCreneaux: mocks.fetchDepartementCreneaux };
+  return {
+    ...actual,
+    fetchDepartementCreneaux: mocks.fetchDepartementCreneaux,
+    loadPreFetchedCreneaux: mocks.loadPreFetchedCreneaux,
+  };
 });
 vi.mock('./notify', () => ({
   formatNewCreneauxMessage: (creneaux: unknown) => `formatted:${JSON.stringify(creneaux)}`,
@@ -35,6 +40,10 @@ describe('run', () => {
     vi.clearAllMocks();
     process.env.COOKIE_HEADER = 'session=abc';
     process.exitCode = undefined;
+    // Empty by default (matches the real function's behavior when
+    // creneaux.json is missing) - tests that care about pre-fetched data
+    // override this explicitly.
+    mocks.loadPreFetchedCreneaux.mockReturnValue(new Map());
   });
 
   it('skips the run entirely when shouldRunCheck is false', async () => {
@@ -83,8 +92,25 @@ describe('run', () => {
     expect(mocks.writeState).toHaveBeenCalled();
   });
 
-  it('sets exitCode to 1 and does not write state when COOKIE_HEADER is not set', async () => {
+  it('sets exitCode to 1 and does not write state when neither COOKIE_HEADER nor pre-fetched data is available', async () => {
     delete process.env.COOKIE_HEADER;
+    mocks.readState.mockResolvedValue(null);
+    // Explicit even though it's already the beforeEach default - this test
+    // is specifically about the "both extraction methods failed" case.
+    mocks.loadPreFetchedCreneaux.mockReturnValue(new Map());
+
+    await run(NOW);
+
+    expect(process.exitCode).toBe(1);
+    expect(mocks.fetchDepartementCreneaux).not.toHaveBeenCalled();
+    expect(mocks.writeState).not.toHaveBeenCalled();
+  });
+
+  it('sets exitCode to 1 when COOKIE_HEADER is an empty string and there is no pre-fetched data', async () => {
+    // .github/workflows/check-slots.yml now exports COOKIE_HEADER="" rather
+    // than leaving it unset when cookie.txt is missing - must be treated
+    // the same as unset, not as "a cookie that happens to be empty".
+    process.env.COOKIE_HEADER = '';
     mocks.readState.mockResolvedValue(null);
 
     await run(NOW);
@@ -92,6 +118,19 @@ describe('run', () => {
     expect(process.exitCode).toBe(1);
     expect(mocks.fetchDepartementCreneaux).not.toHaveBeenCalled();
     expect(mocks.writeState).not.toHaveBeenCalled();
+  });
+
+  it('proceeds using pre-fetched data when COOKIE_HEADER is empty but browser-fetch data exists', async () => {
+    process.env.COOKIE_HEADER = '';
+    mocks.readState.mockResolvedValue(null);
+    mocks.loadPreFetchedCreneaux.mockReturnValue(new Map([['027', { status: 200, body: '[]' }]]));
+    mocks.fetchDepartementCreneaux.mockResolvedValue([]);
+
+    await run(NOW);
+
+    expect(process.exitCode).toBeUndefined();
+    expect(mocks.fetchDepartementCreneaux).toHaveBeenCalledTimes(DEPARTEMENTS.length);
+    expect(mocks.writeState).toHaveBeenCalled();
   });
 
   it('keeps previous data for a departement whose fetch fails, and still succeeds', async () => {

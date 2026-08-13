@@ -30,17 +30,24 @@ export async function run(now: Date = new Date()): Promise<void> {
   // .github/workflows/check-slots.yml. A fresh cookie every run (rather than
   // caching and reusing one) since the automated login is now reliable
   // enough to not need a human, so there's nothing to save by reusing it.
-  const cookieHeader = process.env.COOKIE_HEADER;
-  if (!cookieHeader) {
-    console.error('COOKIE_HEADER environment variable must be set');
+  //
+  // Neither this nor the pre-fetched browser data (loaded below) is
+  // required on its own anymore - either can independently cover every
+  // departement. Only fail outright here if there's truly nothing to work
+  // with at all; a departement covered by neither will still correctly
+  // fail on its own via fetchDepartementCreneaux's SessionExpiredError.
+  const cookieHeader = process.env.COOKIE_HEADER ?? '';
+  const preFetched = loadPreFetchedCreneaux('/tmp/rdvpermis-output/creneaux.json');
+  if (!cookieHeader && preFetched.size === 0) {
+    console.error(
+      'No session cookie and no pre-fetched browser data - both login-container extraction methods failed this run'
+    );
     process.exitCode = 1;
     return;
   }
 
   const previousCreneaux: Creneau[] = previousState ? previousState.creneaux : [];
   const allCreneaux: Creneau[] = [];
-
-  const preFetched = loadPreFetchedCreneaux('/tmp/rdvpermis-output/creneaux.json');
 
   for (const departement of DEPARTEMENTS) {
     try {
