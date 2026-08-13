@@ -1,7 +1,7 @@
 name: Check RdvPermis slots
 
 on:
-#  schedule:
+  schedule:
     # Peak windows (8h-9h, 11h-14h, 16h-18h Paris time), every 5 min. GitHub
     # Actions cron is always UTC with no DST awareness, so these hours are
     # hardcoded for CEST (UTC+2, currently in effect). When Paris switches to
@@ -10,12 +10,12 @@ on:
     # worker's own PEAK_WINDOWS check (worker/src/schedule.ts) evaluates
     # Europe/Paris live and doesn't have this problem -- only this raw cron
     # trigger does.
-#    - cron: '*/5 6,9-11,14-15 * * *'
+    - cron: '*/5 6,9-11,14-15 * * *'
     # All other hours: every 15 min instead of every 5, to keep overall
     # request volume down. Only 4 departements are checked per run now (see
     # worker/src/config.ts), so this cadence keeps the requests-per-hour
     # against the account at or under the previous, already-proven-safe rate.
-#    - cron: '*/15 0-5,7-8,12-13,16-23 * * *'
+    - cron: '*/15 0-5,7-8,12-13,16-23 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -39,7 +39,16 @@ jobs:
         run: |
           rm -rf /tmp/rdvpermis-output
           mkdir -p /tmp/rdvpermis-output
-          docker run --rm --device /dev/dri:/dev/dri \
+          # Fixed name (rather than Docker's default random one each run) so
+          # this container is trackable as a single consistent series in
+          # Grafana/cAdvisor instead of a new, unrelated-looking name every
+          # time. --rm normally cleans it up on exit, but a forcibly-killed
+          # run (job cancellation, runner crash) can leave it behind, so
+          # clear any stale leftover first rather than let a fixed name
+          # collide and hard-fail the next run.
+          docker rm -f rdvpermis-login 2>/dev/null || true
+          docker run --rm --name rdvpermis-login --device /dev/dri:/dev/dri \
+            --cpus="2" --memory="2g" \
             -e EMAIL -e PASSWORD -e IONOS_IMAP_PASSWORD \
             -v /tmp/rdvpermis-output:/output \
             rdvpermis-login
