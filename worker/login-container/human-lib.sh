@@ -21,6 +21,16 @@
 # *randomized* interval (breaks any fixed-period alignment) makes that
 # coincidence require two lucky rolls in a row instead of one.
 #
+# A blank/unrendered page is trivially "stable" by pixel comparison alone -
+# nothing is there to change yet. Confirmed on a 2026-08-26 run: the very
+# first screenshot (still a blank white Chromium tab, spinner still
+# spinning) got declared stable, because three identical all-white
+# captures satisfy the match requirement just as well as three identical
+# fully-rendered ones would. A blank scrot PNG compresses far smaller than
+# a real rendered page (26KB vs 85-106KB across every other screenshot
+# that same run), so use file size as a cheap guard: below MIN_BYTES,
+# never count toward the match streak, no matter how many times it repeats.
+#
 # There's no CDP attached to this Chromium (see check-slots.yml for why: a
 # CDP/software-rendering signature is exactly what Turnstile can
 # fingerprint), so a real browser 'load' event isn't available here - this
@@ -35,25 +45,32 @@ wait_for_page_stable() {
   local floor="${2:-3}"
   local timeout="${3:-15}"
   local required_matches=3
+  local min_bytes=40000
   sleep "$floor"
   local tmp=/tmp/stable-check.png
-  local prev="" cur streak=0
+  local prev="" cur streak=0 size
   local budget_ms=$(( (timeout - floor) * 1000 ))
   local elapsed_ms=0
   while (( elapsed_ms < budget_ms )); do
     scrot "$tmp" 2>/dev/null || true
-    cur=$(md5sum "$tmp" 2>/dev/null | cut -d' ' -f1)
-    if [[ -n "$cur" && "$cur" == "$prev" ]]; then
-      streak=$((streak+1))
-      if (( streak >= required_matches - 1 )); then
-        echo "[run] $label: page stable after floor+${elapsed_ms}ms (~$(( (floor*1000+elapsed_ms)/1000 ))s total)"
-        rm -f "$tmp"
-        return 0
-      fi
-    else
+    size=$(stat -c%s "$tmp" 2>/dev/null || echo 0)
+    if (( size < min_bytes )); then
       streak=0
+      prev=""
+    else
+      cur=$(md5sum "$tmp" 2>/dev/null | cut -d' ' -f1)
+      if [[ -n "$cur" && "$cur" == "$prev" ]]; then
+        streak=$((streak+1))
+        if (( streak >= required_matches - 1 )); then
+          echo "[run] $label: page stable after floor+${elapsed_ms}ms (~$(( (floor*1000+elapsed_ms)/1000 ))s total)"
+          rm -f "$tmp"
+          return 0
+        fi
+      else
+        streak=0
+      fi
+      prev="$cur"
     fi
-    prev="$cur"
     local interval_ms=$(( 400 + RANDOM % 500 ))
     sleep "0.$(printf '%03d' "$interval_ms")"
     elapsed_ms=$((elapsed_ms + interval_ms))
