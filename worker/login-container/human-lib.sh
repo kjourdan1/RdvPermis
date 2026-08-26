@@ -63,6 +63,46 @@ wait_for_page_stable() {
   return 0
 }
 
+# Waits for the window title to change away from BEFORE_TITLE - real proof
+# a navigation actually started, since Chromium updates WM_NAME as soon as
+# a new document begins loading. Then falls through to wait_for_page_stable
+# so the *new* page also finishes rendering before returning.
+#
+# This exists because wait_for_page_stable alone can't handle a submit-like
+# click: a 2026-08-26 test run showed it declare a post-submit page
+# "stable" after 11s of polling while the screen (and title) were still
+# exactly what they were before the click - the login page can sit 100%
+# pixel-identical for as long as the backend takes to respond, which no
+# amount of visual-stability polling can distinguish from "nothing more is
+# ever going to change here". The title, unlike page pixels, only reads
+# one of two values (unchanged or changed) - it can't have a "static but
+# still working on it" state to be fooled by.
+#
+# Uses the global $WIN (the chromium window id) set earlier in run.sh.
+# Requires $WIN in scope - always true here since this is sourced directly
+# into run.sh, never run standalone.
+wait_for_navigation() {
+  local label="$1"
+  local before_title="$2"
+  local title_timeout="${3:-90}"
+  local settle_floor="${4:-3}"
+  local settle_timeout="${5:-30}"
+  local waited=0
+  local cur_title="$before_title"
+  while (( waited < title_timeout )); do
+    cur_title=$(xdotool getwindowname "$WIN" 2>/dev/null || echo "$before_title")
+    [[ "$cur_title" != "$before_title" ]] && break
+    sleep 1
+    waited=$((waited+1))
+  done
+  if [[ "$cur_title" == "$before_title" ]]; then
+    echo "[run] $label: title never changed within ${title_timeout}s, proceeding anyway"
+  else
+    echo "[run] $label: title changed after ${waited}s"
+  fi
+  wait_for_page_stable "$label (settling)" "$settle_floor" "$settle_timeout"
+}
+
 declare -A ADJ=(
   [a]=q [b]=v [c]=x [d]=s [e]=z [f]=d [g]=f [h]=g [i]=u [j]=h [k]=j [l]=k [m]=l
   [n]=b [o]=i [p]=o [q]=s [r]=e [s]=d [t]=r [u]=y [v]=c [w]=x [x]=c [y]=t [z]=e

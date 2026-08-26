@@ -219,9 +219,10 @@ wait_for_page_stable "turnstile challenge" 6 35
 snap 3-turnstile.png
 
 echo '[run] submitting'
+PRE_SUBMIT_TITLE=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '')
 move_mouse_human 632 605
 xdotool click 1
-wait_for_page_stable "post-submit navigation" 10 60
+wait_for_navigation "post-submit navigation" "$PRE_SUBMIT_TITLE" 90 5 30
 snap 4-final.png
 
 # The site now requires a 6-digit email verification code on every login
@@ -241,9 +242,10 @@ sleep 1
 type_human "$CODE"
 sleep 1
 snap 5-code-entered.png
+PRE_VALIDATE_TITLE=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '')
 move_mouse_human 687 702
 xdotool click 1
-wait_for_page_stable "post-2FA-validation navigation" 5 60
+wait_for_navigation "post-2FA-validation navigation" "$PRE_VALIDATE_TITLE" 90 5 30
 snap 6-code-submitted.png
 
 TITLE=$(xdotool getwindowname "$WIN")
