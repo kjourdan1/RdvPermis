@@ -1,46 +1,62 @@
 #!/bin/bash
 
-# Sleeps FLOOR seconds unconditionally, then polls scrot screenshots until
-# two consecutive captures (0.5s apart) are byte-identical -- rendering has
-# visually settled -- or TIMEOUT seconds total have elapsed. The floor is
-# required, not just a nicety: a page can sit pixel-identical for a second
-# or more right after a click while a network request it triggered is still
-# in flight, before anything visibly starts loading (confirmed on a
-# 2026-08-26 test run - a bare stability poll with no floor called a login
-# submit "stable" after 1s while still showing the pre-submit login page,
-# because nothing had started rendering yet; the script moved on to read
-# the verification-code email before the site had even processed the
-# submit). The floor should be at least the shortest this transition has
-# ever reliably taken; the poll afterward is what adapts to it taking
-# longer than that under load, which a fixed sleep alone can't do. There's
-# no CDP attached to this Chromium (see check-slots.yml for why: a
+# Sleeps FLOOR seconds unconditionally, then polls scrot screenshots at a
+# randomized ~0.4-0.9s cadence until REQUIRED_MATCHES consecutive captures
+# are all byte-identical -- rendering has visually settled -- or TIMEOUT
+# seconds total have elapsed.
+#
+# The floor is required, not just a nicety: a page can sit pixel-identical
+# for a second or more right after a click while a network request it
+# triggered is still in flight, before anything visibly starts loading
+# (confirmed on a 2026-08-26 test run - a bare stability poll with no floor
+# called a login submit "stable" after 1s while still showing the
+# pre-submit login page, because nothing had started rendering yet).
+#
+# Two consecutive matching captures isn't enough of a signal either: a
+# later 2026-08-26 run showed "stable" declared after two identical frames
+# while Chromium's own tab spinner and stop-icon were still visibly showing
+# the page as loading in that same screenshot - a fixed 0.5s sample
+# interval can alias with a periodic loading-spinner animation and see the
+# same phase twice by coincidence. Requiring three consecutive matches at a
+# *randomized* interval (breaks any fixed-period alignment) makes that
+# coincidence require two lucky rolls in a row instead of one.
+#
+# There's no CDP attached to this Chromium (see check-slots.yml for why: a
 # CDP/software-rendering signature is exactly what Turnstile can
 # fingerprint), so a real browser 'load' event isn't available here - this
 # floor+poll is the closest CDP-free proxy. Always returns 0 - under this
 # script's `set -e`, timing out and proceeding anyway needs to not abort
 # the run, same fallback behavior the fixed sleeps this replaces already
-# had.
+# had. Run unattended on a schedule, so erring toward a longer wait over a
+# premature click is the right tradeoff - only the timeout, not correctness,
+# depends on picking a "big enough" number.
 wait_for_page_stable() {
   local label="$1"
   local floor="${2:-3}"
   local timeout="${3:-15}"
+  local required_matches=3
   sleep "$floor"
   local tmp=/tmp/stable-check.png
-  local prev="" cur
-  local max_iters=$(( (timeout - floor) * 2 ))
-  (( max_iters < 2 )) && max_iters=2
-  local i=0
-  while (( i < max_iters )); do
+  local prev="" cur streak=0
+  local budget_ms=$(( (timeout - floor) * 1000 ))
+  local elapsed_ms=0
+  while (( elapsed_ms < budget_ms )); do
     scrot "$tmp" 2>/dev/null || true
     cur=$(md5sum "$tmp" 2>/dev/null | cut -d' ' -f1)
     if [[ -n "$cur" && "$cur" == "$prev" ]]; then
-      echo "[run] $label: page stable ~$(( floor + (i+1)/2 ))s after click"
-      rm -f "$tmp"
-      return 0
+      streak=$((streak+1))
+      if (( streak >= required_matches - 1 )); then
+        echo "[run] $label: page stable after floor+${elapsed_ms}ms (~$(( (floor*1000+elapsed_ms)/1000 ))s total)"
+        rm -f "$tmp"
+        return 0
+      fi
+    else
+      streak=0
     fi
     prev="$cur"
-    i=$((i+1))
-    sleep 0.5
+    local interval_ms=$(( 400 + RANDOM % 500 ))
+    sleep "0.$(printf '%03d' "$interval_ms")"
+    elapsed_ms=$((elapsed_ms + interval_ms))
   done
   echo "[run] $label: page never stabilized within ${timeout}s total, proceeding anyway"
   rm -f "$tmp"
