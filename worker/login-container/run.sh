@@ -172,7 +172,7 @@ snap() {
 # step while the Pi was under sustained load. A slow-to-render page + a
 # click that assumes it already has is exactly that failure mode; polling
 # for the real condition instead of a bigger guess is the fix.
-wait_for_page_stable "initial page load" 15
+wait_for_page_stable "initial page load" 10 20
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
 sleep 1
@@ -181,7 +181,7 @@ snap 0-initial.png
 echo '[run] accepting cookies'
 move_mouse_human 569 $((665+OFF))
 xdotool click 1
-wait_for_page_stable "cookie banner dismissed" 8
+wait_for_page_stable "cookie banner dismissed" 5 10
 snap 0b-after-cookies.png
 
 echo '[run] scrolling to form'
@@ -215,13 +215,13 @@ snap 2-filled.png
 echo '[run] clicking turnstile'
 move_mouse_human 453 522
 xdotool click 1
-wait_for_page_stable "turnstile challenge" 15
+wait_for_page_stable "turnstile challenge" 6 15
 snap 3-turnstile.png
 
 echo '[run] submitting'
 move_mouse_human 632 605
 xdotool click 1
-wait_for_page_stable "post-submit navigation" 20
+wait_for_page_stable "post-submit navigation" 10 25
 snap 4-final.png
 
 # The site now requires a 6-digit email verification code on every login
@@ -243,7 +243,7 @@ sleep 1
 snap 5-code-entered.png
 move_mouse_human 687 702
 xdotool click 1
-wait_for_page_stable "post-2FA-validation navigation" 20
+wait_for_page_stable "post-2FA-validation navigation" 5 20
 snap 6-code-submitted.png
 
 TITLE=$(xdotool getwindowname "$WIN")

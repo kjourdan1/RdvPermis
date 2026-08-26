@@ -1,27 +1,40 @@
 #!/bin/bash
 
-# Polls scrot screenshots until two consecutive captures (0.5s apart) are
-# byte-identical -- rendering has visually settled -- or TIMEOUT seconds
-# elapse. There's no CDP attached to this Chromium (see check-slots.yml for
-# why: a CDP/software-rendering signature is exactly what Turnstile can
-# fingerprint), so a real browser 'load' event isn't available here: this is
-# the closest CDP-free proxy, replacing a guessed fixed sleep with the actual
-# condition (page stopped changing). Always returns 0 - under this script's
-# `set -e`, timing out and proceeding anyway needs to not abort the run, and
-# that's the same fallback behavior the fixed sleeps this replaces already
+# Sleeps FLOOR seconds unconditionally, then polls scrot screenshots until
+# two consecutive captures (0.5s apart) are byte-identical -- rendering has
+# visually settled -- or TIMEOUT seconds total have elapsed. The floor is
+# required, not just a nicety: a page can sit pixel-identical for a second
+# or more right after a click while a network request it triggered is still
+# in flight, before anything visibly starts loading (confirmed on a
+# 2026-08-26 test run - a bare stability poll with no floor called a login
+# submit "stable" after 1s while still showing the pre-submit login page,
+# because nothing had started rendering yet; the script moved on to read
+# the verification-code email before the site had even processed the
+# submit). The floor should be at least the shortest this transition has
+# ever reliably taken; the poll afterward is what adapts to it taking
+# longer than that under load, which a fixed sleep alone can't do. There's
+# no CDP attached to this Chromium (see check-slots.yml for why: a
+# CDP/software-rendering signature is exactly what Turnstile can
+# fingerprint), so a real browser 'load' event isn't available here - this
+# floor+poll is the closest CDP-free proxy. Always returns 0 - under this
+# script's `set -e`, timing out and proceeding anyway needs to not abort
+# the run, same fallback behavior the fixed sleeps this replaces already
 # had.
 wait_for_page_stable() {
   local label="$1"
-  local timeout="${2:-15}"
+  local floor="${2:-3}"
+  local timeout="${3:-15}"
+  sleep "$floor"
   local tmp=/tmp/stable-check.png
   local prev="" cur
-  local max_iters=$(( timeout * 2 ))
+  local max_iters=$(( (timeout - floor) * 2 ))
+  (( max_iters < 2 )) && max_iters=2
   local i=0
   while (( i < max_iters )); do
     scrot "$tmp" 2>/dev/null || true
     cur=$(md5sum "$tmp" 2>/dev/null | cut -d' ' -f1)
     if [[ -n "$cur" && "$cur" == "$prev" ]]; then
-      echo "[run] $label: page stable after ~$(( (i+1) / 2 ))s"
+      echo "[run] $label: page stable ~$(( floor + (i+1)/2 ))s after click"
       rm -f "$tmp"
       return 0
     fi
@@ -29,7 +42,7 @@ wait_for_page_stable() {
     i=$((i+1))
     sleep 0.5
   done
-  echo "[run] $label: page never stabilized within ${timeout}s, proceeding anyway"
+  echo "[run] $label: page never stabilized within ${timeout}s total, proceeding anyway"
   rm -f "$tmp"
   return 0
 }
