@@ -287,8 +287,11 @@ xdotool click 1
 # xclip below can read it - a flat `sleep 1` here (unlike the FETCHDONE
 # poll above) let xclip run before that registration finished whenever the
 # Pi was under load, producing xclip's "target STRING not available" and
-# forcing every departement onto the curl fallback for that run.
-for i in $(seq 1 10); do
+# forcing every departement onto the curl fallback for that run. Budget
+# matches the FETCHDONE poll (40s, not the original 10s): a 2026-08-26 test
+# run (33006499760) still hit COPYOK only after this loop's old 10s bound
+# had already given up and let xclip read an unset clipboard.
+for i in $(seq 1 40); do
   CURRENT_TITLE=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '')
   [[ "$CURRENT_TITLE" == *"COPYOK"* || "$CURRENT_TITLE" == *"COPYFAILED"* || "$CURRENT_TITLE" == *"COPYEMPTY"* ]] && break
   sleep 1
