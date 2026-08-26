@@ -251,6 +251,17 @@ if [[ "$TITLE" != *'Mon espace candidat'* ]]; then
 fi
 echo '[run] LOGIN SUCCESS'
 
+# Dismiss the "Save password?" prompt here, before the browser-fetch step
+# below, not after it as this used to do. Chromium can pop it up right
+# after this navigation, and evidence from a 2026-08-26 failed run (see
+# 5-browser-fetch.png diagnostic artifact for run 33005812567) shows it
+# still on screen while the fetch/copy bookmarklet clicks were firing -
+# title never reached FETCHDONE that run, consistent with the dialog
+# swallowing the ctrl+shift+b bookmarks-bar shortcut or the clicks below.
+move_mouse_human 1013 375
+xdotool click 1
+sleep 1
+
 # Toggling the bookmarks bar here (not earlier) is deliberate - it shifts
 # page content down, which would invalidate the already-calibrated pixel
 # coordinates used by every step above this one (login form, Turnstile,
@@ -296,11 +307,6 @@ else
   cat /tmp/xclip-err.log || true
   rm -f /output/creneaux.json
 fi
-
-# Dismiss the "Save password?" prompt if Chromium shows one.
-move_mouse_human 1013 375
-xdotool click 1
-sleep 1
 
 # Extract the session cookie by reading Chromium's on-disk SQLite db
 # directly instead of driving DevTools - see
