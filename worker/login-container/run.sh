@@ -272,7 +272,16 @@ done
 echo "[run] browser-fetch title after fetch click: $(xdotool getwindowname "$WIN")"
 xdotool mousemove 150 95
 xdotool click 1
-sleep 1
+# execCommand('copy') has to register the X11 CLIPBOARD selection before
+# xclip below can read it - a flat `sleep 1` here (unlike the FETCHDONE
+# poll above) let xclip run before that registration finished whenever the
+# Pi was under load, producing xclip's "target STRING not available" and
+# forcing every departement onto the curl fallback for that run.
+for i in $(seq 1 10); do
+  CURRENT_TITLE=$(xdotool getwindowname "$WIN" 2>/dev/null || echo '')
+  [[ "$CURRENT_TITLE" == *"COPYOK"* || "$CURRENT_TITLE" == *"COPYFAILED"* || "$CURRENT_TITLE" == *"COPYEMPTY"* ]] && break
+  sleep 1
+done
 echo "[run] browser-fetch title after copy click: $(xdotool getwindowname "$WIN")"
 snap 5-browser-fetch.png
 set +e
