@@ -63,6 +63,22 @@ source /opt/human-lib.sh
 
 rm -rf /tmp/chromium-profile
 mkdir -p /tmp/chromium-profile/Default
+# Disables Chromium's "Save password?" prompt outright. It pops up as soon
+# as the login form is submitted (not just after 2FA) and stays on screen
+# through the rest of this pixel-coordinate-driven flow - confirmed on
+# 2026-08-26 test run 33007021667 sitting over the 2FA page and producing
+# a LOGIN FAILED with no other explanation, after an earlier run
+# (33005812567) showed the same dialog blocking the browser-fetch
+# bookmarklet clicks further down. A single click-to-dismiss at any one
+# point in the script is a losing game against a dialog that can appear
+# at several different points - remove the feature instead of chasing it.
+cat > /tmp/chromium-profile/Default/Preferences << 'PREFERENCES_EOF'
+{
+  "credentials_enable_service": false,
+  "credentials_enable_autosignin": false,
+  "profile": {"password_manager_enabled": false}
+}
+PREFERENCES_EOF
 # Pre-seeds two bookmarks used later (after login+2FA) to fetch creneaux
 # from within this authenticated session instead of relying solely on
 # checkSlots.ts's separate curl request - see
