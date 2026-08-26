@@ -165,15 +165,14 @@ snap() {
 # too early lands on whatever partial content happened to render first --
 # in one run, that was the FranceConnect button instead of the cookie
 # banner, sending the whole flow down the wrong provider's login page.
-# There's no CDP here to wait for a real "page loaded" event, so a generous
-# fixed margin is the pragmatic fix. Margins throughout this login flow were
-# widened again after a run of consecutive failures all landing on the
-# "Mot de passe oublié" page right around the password-fill step - this Pi
-# was under sustained load from repeated docker build/run cycles at the
-# time, and a slow-to-render page + a click that assumes it already has is
-# exactly the failure mode that made the old DevTools extraction flaky too.
-# Trading a few more seconds per run for not racing page renders under load.
-sleep 10
+# Waits for the screen to visually settle (see wait_for_page_stable in
+# human-lib.sh) instead of a fixed margin now - this used to be a flat
+# `sleep 10`, widened once already after a run of consecutive failures all
+# landing on the "Mot de passe oublié" page right around the password-fill
+# step while the Pi was under sustained load. A slow-to-render page + a
+# click that assumes it already has is exactly that failure mode; polling
+# for the real condition instead of a bigger guess is the fix.
+wait_for_page_stable "initial page load" 15
 xdotool windowfocus "$WIN"
 xdotool windowraise "$WIN"
 sleep 1
@@ -182,7 +181,7 @@ snap 0-initial.png
 echo '[run] accepting cookies'
 move_mouse_human 569 $((665+OFF))
 xdotool click 1
-sleep 5
+wait_for_page_stable "cookie banner dismissed" 8
 snap 0b-after-cookies.png
 
 echo '[run] scrolling to form'
@@ -216,13 +215,13 @@ snap 2-filled.png
 echo '[run] clicking turnstile'
 move_mouse_human 453 522
 xdotool click 1
-sleep 6
+wait_for_page_stable "turnstile challenge" 15
 snap 3-turnstile.png
 
 echo '[run] submitting'
 move_mouse_human 632 605
 xdotool click 1
-sleep 10
+wait_for_page_stable "post-submit navigation" 20
 snap 4-final.png
 
 # The site now requires a 6-digit email verification code on every login
@@ -244,7 +243,7 @@ sleep 1
 snap 5-code-entered.png
 move_mouse_human 687 702
 xdotool click 1
-sleep 5
+wait_for_page_stable "post-2FA-validation navigation" 20
 snap 6-code-submitted.png
 
 TITLE=$(xdotool getwindowname "$WIN")

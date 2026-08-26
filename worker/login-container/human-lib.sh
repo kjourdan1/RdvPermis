@@ -1,4 +1,39 @@
 #!/bin/bash
+
+# Polls scrot screenshots until two consecutive captures (0.5s apart) are
+# byte-identical -- rendering has visually settled -- or TIMEOUT seconds
+# elapse. There's no CDP attached to this Chromium (see check-slots.yml for
+# why: a CDP/software-rendering signature is exactly what Turnstile can
+# fingerprint), so a real browser 'load' event isn't available here: this is
+# the closest CDP-free proxy, replacing a guessed fixed sleep with the actual
+# condition (page stopped changing). Always returns 0 - under this script's
+# `set -e`, timing out and proceeding anyway needs to not abort the run, and
+# that's the same fallback behavior the fixed sleeps this replaces already
+# had.
+wait_for_page_stable() {
+  local label="$1"
+  local timeout="${2:-15}"
+  local tmp=/tmp/stable-check.png
+  local prev="" cur
+  local max_iters=$(( timeout * 2 ))
+  local i=0
+  while (( i < max_iters )); do
+    scrot "$tmp" 2>/dev/null || true
+    cur=$(md5sum "$tmp" 2>/dev/null | cut -d' ' -f1)
+    if [[ -n "$cur" && "$cur" == "$prev" ]]; then
+      echo "[run] $label: page stable after ~$(( (i+1) / 2 ))s"
+      rm -f "$tmp"
+      return 0
+    fi
+    prev="$cur"
+    i=$((i+1))
+    sleep 0.5
+  done
+  echo "[run] $label: page never stabilized within ${timeout}s, proceeding anyway"
+  rm -f "$tmp"
+  return 0
+}
+
 declare -A ADJ=(
   [a]=q [b]=v [c]=x [d]=s [e]=z [f]=d [g]=f [h]=g [i]=u [j]=h [k]=j [l]=k [m]=l
   [n]=b [o]=i [p]=o [q]=s [r]=e [s]=d [t]=r [u]=y [v]=c [w]=x [x]=c [y]=t [z]=e
