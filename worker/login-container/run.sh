@@ -287,9 +287,17 @@ sleep 1
 # existing cookie-extraction + curl path (right after this block,
 # unchanged) is the fallback checkSlots.ts already knows how to use per
 # departement if this produces nothing usable.
+#
+# The old flat `sleep 1` after the toggle keystroke had the same blind-spot
+# every other fixed sleep in this script did: a 2026-08-26 scheduled run
+# (33018386078) clicked (85,95) before the bar had actually rendered and
+# landed on a page link instead, navigating clean away to Légifrance - a
+# different government site entirely - instead of hitting the "fetch"
+# bookmark. wait_for_page_stable confirms the bar has actually appeared
+# (and the page reflowed under it) before the click below fires.
 echo '[run] fetching creneaux from within the browser session'
 xdotool key --clearmodifiers ctrl+shift+b
-sleep 1
+wait_for_page_stable "bookmarks bar toggled" 1 15
 xdotool mousemove 85 95
 xdotool click 1
 for i in $(seq 1 40); do
