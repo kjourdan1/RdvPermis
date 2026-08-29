@@ -36,6 +36,23 @@ for i in $(seq 1 20); do
 done
 xdpyinfo >/dev/null 2>&1 || { echo '[run] Xorg failed to start'; cat /tmp/xorg.log; exit 1; }
 echo '[run] Xorg is up'
+
+# Every keystroke below goes through xdotool as a discrete synthetic
+# press+release - but X11's key autorepeat treats a synthetic press exactly
+# like a physical one: if the process sending the matching release event
+# gets scheduled late (this Pi runs chronically low on free RAM, per the
+# 2026-08-27 investigation), the X server sees the key as "held" past the
+# repeat-delay threshold and starts generating repeated keydown events on
+# its own. Confirmed as the exact cause of run 33277264585 (2026-08-29):
+# `type_human "$EMAIL"` produced "kkkkkkkkkillian.jourdan.78@gmail.com" in
+# the email field (8 spurious leading 'k's, visible in that run's
+# 3-turnstile.png diagnostic) - an invalid address, which the site rejected
+# and the login flow stalled on for 90s waiting for a navigation that could
+# never happen. Autorepeat serves no purpose here (nothing in this script
+# ever wants a key held down), so disable it outright for this display
+# rather than trying to detect/retry the corruption after the fact.
+xset r off
+
 # hdmi_force_hotplug:1=1 + hdmi_group:1=1 + hdmi_mode:1=16 on the host (see
 # RPI4B/config_ssh_init_dietpi.md) force HDMI-2 to report 1920x1080 even with
 # no monitor attached -- real hardware-accelerated rendering, not the
