@@ -1,12 +1,8 @@
 name: Debug Pi (diagnostics)
 
 on:
-  workflow_dispatch:
-    inputs:
-      restart_ssh:
-        description: "Set to 'yes' to attempt restarting sshd after diagnostics"
-        required: false
-        default: "no"
+  push:
+    branches: [debug-pi-ssh]
 
 jobs:
   diag:
@@ -38,10 +34,3 @@ jobs:
           echo "== fstab"; sudo -n cat /etc/fstab 2>/dev/null || cat /etc/fstab 2>&1 || true
           echo "== lvm"; sudo -n vgs 2>&1; sudo -n lvs 2>&1; sudo -n pvs 2>&1 || true
 
-      - name: Optional sshd restart
-        if: ${{ github.event.inputs.restart_ssh == 'yes' }}
-        run: |
-          echo "== attempting ssh restart"
-          sudo -n systemctl start ssh 2>&1 || sudo -n systemctl start sshd 2>&1 || echo "start failed (no passwordless sudo?)"
-          sleep 2
-          ss -tlnp 2>/dev/null | grep ':22' && echo "SSH_NOW_LISTENING=yes" || echo "SSH_NOW_LISTENING=no"
